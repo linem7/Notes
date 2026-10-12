@@ -42,18 +42,10 @@ public enum BoardSections {
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
-    static func isValidDay(_ day: String) -> Bool {
-        let parts = day.split(separator: "-", omittingEmptySubsequences: false)
-        guard parts.count == 3, parts.map(\.count) == [4, 2, 2],
-              let year = Int(parts[0]), let month = Int(parts[1]), let d = Int(parts[2]),
-              parts.allSatisfy({ $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return false }
-        return DateComponents(calendar: Calendar(identifier: .gregorian), year: year, month: month, day: d).isValidDate
-    }
-
     private static func section(of note: Note, todayDay: String) -> BoardSection {
         if note.doneAt != nil { return .done }
         // 不是真实日历日的 day（空串、"2026-13-40"）当作没有 Due Date，免得字符串比较把它排进 Overdue
-        guard let due = note.due, isValidDay(due.day) else { return .noDate }
+        guard let due = note.due, DueDate.isValidDay(due.day) else { return .noDate }
         if due.day < todayDay { return .overdue }
         if due.day == todayDay { return .today }
         return .upcoming

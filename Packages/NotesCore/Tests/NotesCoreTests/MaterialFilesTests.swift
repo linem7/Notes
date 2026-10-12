@@ -209,10 +209,101 @@ struct MaterialFilesTests {
         _ = try files.makeStagingSession()
         let stray = files.stagingDirectory.appendingPathComponent("stray.txt")
         try Data("x".utf8).write(to: stray)
-        let result = files.clearStaging(keeping: [keep.id])
+        let result = files.clearStaging(keeping: [keep.id], respectingGracePeriod: false)
         #expect(result.removed == 2)    // 另一个会话目录 + 根目录里的零散文件
         #expect(result.failed == 0)
         #expect(!FileManager.default.fileExists(atPath: stray.path))
         #expect(FileManager.default.fileExists(atPath: keep.directory.path))
+    }
+
+    @Test func clearStagingWithGraceSkipsFreshEntriesAndRemovesOldOnes() throws {
+        let files = try makeFiles()
+        let fresh = try files.makeStagingSession()
+        let old = try files.makeStagingSession()
+        let freshStray = files.stagingDirectory.appendingPathComponent("fresh.txt")
+        let oldStray = files.stagingDirectory.appendingPathComponent("old.txt")
+        try Data("x".utf8).write(to: freshStray)
+        try Data("x".utf8).write(to: oldStray)
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        for url in [old.directory, oldStray] {
+            try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: url.path)
+        }
+
+        let result = files.clearStaging(respectingGracePeriod: true)
+        #expect(result.removed == 2)
+        #expect(result.failed == 0)
+        #expect(FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(FileManager.default.fileExists(atPath: freshStray.path))
+        #expect(!FileManager.default.fileExists(atPath: old.directory.path))
+        #expect(!FileManager.default.fileExists(atPath: oldStray.path))
+    }
+
+    @Test func clearStagingWithoutGraceRemovesEverythingNotKept() throws {
+        let files = try makeFiles()
+        let fresh = try files.makeStagingSession()
+        let kept = try files.makeStagingSession()
+        let result = files.clearStaging(keeping: [kept.id], respectingGracePeriod: false)
+        #expect(result.removed == 1)
+        #expect(!FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(FileManager.default.fileExists(atPath: kept.directory.path))
+    }
+
+    @Test func addingAFileToAnOldSessionMakesItFreshAgain() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: session.directory.path)
+        _ = try files.stage(data: Data("pasted".utf8), name: "a.txt", in: session)
+        #expect(files.clearStaging(respectingGracePeriod: true).removed == 0)
+        #expect(FileManager.default.fileExists(atPath: session.directory.path))
+    }
+
+    // MARK: 宽限期边界（注入 now）
+
+    /// 固定的整秒时间，写进文件系统再读回来不会有舍入。
+    private let stamp = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func setModified(_ url: URL, to date: Date) throws {
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+
+    @Test func stagingEntryExactlyAtTheGracePeriodIsKeptOneSecondLaterItGoes() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        try setModified(session.directory, to: stamp)
+
+        #expect(files.clearStaging(respectingGracePeriod: true, now: stamp.addingTimeInterval(600)).removed == 0)
+        #expect(FileManager.default.fileExists(atPath: session.directory.path))
+        #expect(files.clearStaging(respectingGracePeriod: true, now: stamp.addingTimeInterval(601)).removed == 1)
+        #expect(!FileManager.default.fileExists(atPath: session.directory.path))
+    }
+
+    @Test func garbageExactlyAtTheGracePeriodIsKeptOneSecondLaterItGoes() throws {
+        let files = try makeFiles()
+        let name = try files.write(Data("x".utf8), ext: "txt")
+        try setModified(files.filesDirectory.appendingPathComponent(name), to: stamp)
+
+        let atBoundary = files.collectGarbage(referenced: [], now: stamp.addingTimeInterval(600))
+        #expect(atBoundary.removed == 0)
+        #expect(atBoundary.keptInGracePeriod == 1)
+        #expect(files.collectGarbage(referenced: [], now: stamp.addingTimeInterval(601)).removed == 1)
+        #expect(!entries(files).contains(name))
+    }
+
+    @Test func gracePeriodIsStillOffWhenNotRequestedForStaging() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        try setModified(session.directory, to: stamp)
+        #expect(files.clearStaging(respectingGracePeriod: false, now: stamp).removed == 1)
+    }
+
+    @Test func isPastGracePeriodKeepsUnknownAndExactlyTenMinutesOldAndDropsOlder() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(!MaterialFiles.isPastGracePeriod(modified: nil, now: now))
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now, now: now))
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(-600), now: now))
+        #expect(MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(-601), now: now))
+        // 修改时间在「现在」之后（时钟被调过）：当作新的
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(60), now: now))
     }
 }
