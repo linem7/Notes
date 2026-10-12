@@ -10,14 +10,14 @@ struct BoardStateTests {
 
     @Test func onlyOneRowExpandedAtATime() {
         var state = BoardState()
-        let result = state.toggleExpanded(a)
+        let r1 = state.toggleExpanded(a)
         #expect(r1)
         #expect(state.expandedID == a)
-        let result = state.toggleExpanded(b)
+        let r2 = state.toggleExpanded(b)
         #expect(r2)
         #expect(state.expandedID == b)
         #expect(state.selectedID == b)
-        let result = state.toggleExpanded(b)
+        let r3 = state.toggleExpanded(b)
         #expect(r3)
         #expect(state.expandedID == nil)
         #expect(state.selectedID == b)  // 收起后仍选中，⌫ 可用
@@ -26,30 +26,30 @@ struct BoardStateTests {
     @Test func editingBlocksSwitchingAndCollapsing() {
         var state = BoardState()
         state.toggleExpanded(a)
-        let result = state.beginEditing(a)
+        let r4 = state.beginEditing(a)
         #expect(r4)
-        let result = state.toggleExpanded(b)
+        let r5 = state.toggleExpanded(b)
         #expect(!r5)
-        let result = state.toggleExpanded(a)
+        let r6 = state.toggleExpanded(a)
         #expect(!r6)
         #expect(state.expandedID == a)
         #expect(state.deletableID == nil)
         state.endEditing()
-        let result = state.toggleExpanded(b)
+        let r7 = state.toggleExpanded(b)
         #expect(r7)
         #expect(state.deletableID == b)
     }
 
     @Test func onlyExpandedRowCanBeEdited() {
         var state = BoardState()
-        let result = state.beginEditing(a)
+        let r8 = state.beginEditing(a)
         #expect(!r8)
         state.toggleExpanded(a)
-        let result = state.beginEditing(b)
+        let r9 = state.beginEditing(b)
         #expect(!r9)
-        let result = state.beginEditing(a)
+        let r10 = state.beginEditing(a)
         #expect(r10)
-        let result = state.beginEditing(a)
+        let r11 = state.beginEditing(a)
         #expect(!r11)
     }
 
@@ -68,15 +68,15 @@ struct BoardStateTests {
         var state = BoardState()
         state.requestHighlight([a, b])
         // observe 先只发来 a
-        let result = state.reconcile(existing: [a, c])
+        let r12 = state.reconcile(existing: [a, c])
         #expect(r12 == [a])
         #expect(state.highlightedIDs == [a])
         // 之后 b 也到了
-        let result = state.reconcile(existing: [a, b, c])
+        let r13 = state.reconcile(existing: [a, b, c])
         #expect(r13 == [b])
         #expect(state.highlightedIDs == [a, b])
         // 再刷新不重复开始
-        let result = state.reconcile(existing: [a, b, c])
+        let r14 = state.reconcile(existing: [a, b, c])
         #expect(r14.isEmpty)
     }
 
@@ -87,7 +87,7 @@ struct BoardStateTests {
         state.expireHighlight(started)
         #expect(state.highlightedIDs.isEmpty)
         // 过期后刷新不会再次高亮
-        let result = state.reconcile(existing: [a])
+        let r15 = state.reconcile(existing: [a])
         #expect(r15.isEmpty)
     }
 
@@ -97,7 +97,7 @@ struct BoardStateTests {
         state.reconcile(existing: [a, b])
         state.requestHighlight([b])
         #expect(state.highlightedIDs.isEmpty)
-        let result = state.reconcile(existing: [a, b])
+        let r16 = state.reconcile(existing: [a, b])
         #expect(r16 == [b])
         #expect(state.highlightedIDs == [b])
     }
