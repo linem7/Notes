@@ -95,7 +95,7 @@ material(id TEXT PK, noteID → note ON DELETE CASCADE, kind, displayName, store
 ```
 
 - 时间列存 `timeIntervalSinceReferenceDate`（同 Chatbot）。
-- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`、`setDone(id, at:)`、`delete(id)`、`addMaterial`、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`。
+- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`（只写 title / due / detail，完成状态只经 `setDone`）、`setDone(id, at:)`、`delete(id)`、`addMaterial(noteID:from:)`（复制文件并插入 File 记录）、`addMaterial(_ material:)`（文件已在 Note 目录里的记录，Source 和 Web Page 用）、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`。
 - 删除 Note 时先删记录再删 `materials/<noteID>/` 目录；`MaterialFiles` 负责目录的创建、复制、删除。启动时清理一次没有对应记录的孤儿目录。
 - 没有全文搜索（v1 不做搜索）。
 

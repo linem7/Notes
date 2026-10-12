@@ -88,4 +88,33 @@ struct MaterialFilesTests {
         files.clear(session)
         #expect(!FileManager.default.fileExists(atPath: session.directory.path))
     }
+
+    @Test func fileNamesWithPathComponentsAreRejected() throws {
+        let files = try makeFiles()
+        let noteID = UUID()
+        try files.write(Data("secret".utf8), fileName: "ok.txt", noteID: noteID)
+        try Data("outside".utf8).write(to: files.directory(for: noteID).deletingLastPathComponent().appendingPathComponent("outside.txt"))
+        for name in ["../outside.txt", "sub/ok.txt", "/etc/hosts", "..", "."] {
+            let material = Material(noteID: noteID, kind: .file, displayName: "x", storedFile: name)
+            #expect(files.url(for: material, role: .stored) == nil, "\(name)")
+        }
+        let fine = Material(noteID: noteID, kind: .file, displayName: "x", storedFile: "ok.txt")
+        #expect(files.url(for: fine, role: .stored) != nil)
+        let bad = Material(noteID: noteID, kind: .file, displayName: "x", storedFile: "../outside.txt")
+        files.removeFiles(of: bad)
+        #expect(FileManager.default.fileExists(atPath: files.directory(for: noteID).deletingLastPathComponent().appendingPathComponent("outside.txt").path))
+    }
+
+    @Test func clearStagingKeepsListedSessionsAndNoteDirectoriesIgnoreOtherNames() throws {
+        let files = try makeFiles()
+        let keep = try files.makeStagingSession()
+        _ = try files.makeStagingSession()
+        #expect(files.clearStaging(keeping: [keep.id]) == 1)
+        #expect(FileManager.default.fileExists(atPath: keep.directory.path))
+
+        let noteID = UUID()
+        try files.write(Data("a".utf8), fileName: "a.txt", noteID: noteID)
+        try FileManager.default.createDirectory(at: files.materialsDirectory.appendingPathComponent("junk"), withIntermediateDirectories: true)
+        #expect(Set(files.noteDirectories().keys) == [noteID])
+    }
 }

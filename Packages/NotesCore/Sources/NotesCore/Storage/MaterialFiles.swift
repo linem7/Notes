@@ -30,6 +30,11 @@ public struct MaterialFiles: Sendable {
         materialsDirectory.appendingPathComponent(noteID.uuidString, isDirectory: true)
     }
 
+    /// 记录里的文件名只能是 `materials/<noteID>/` 下的一层名字，不能带路径（挡住 "../"）。
+    static func isPlainFileName(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && name == (name as NSString).lastPathComponent
+    }
+
     // MARK: 读取
 
     /// Material 某个文件的绝对路径；记录里没有这个文件，或磁盘上已经不在，返回 nil。
@@ -40,7 +45,7 @@ public struct MaterialFiles: Sendable {
         case .text: name = material.textFile
         case .snapshot: name = material.snapshotFile
         }
-        guard let name else { return nil }
+        guard let name, Self.isPlainFileName(name) else { return nil }
         let url = directory(for: material.noteID).appendingPathComponent(name)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
@@ -88,7 +93,7 @@ public struct MaterialFiles: Sendable {
 
     /// 删掉 Material 记录引用的全部文件。
     public func removeFiles(of material: Material) {
-        for name in [material.storedFile, material.textFile, material.snapshotFile].compactMap({ $0 }) {
+        for name in [material.storedFile, material.textFile, material.snapshotFile].compactMap({ $0 }) where Self.isPlainFileName(name) {
             try? FileManager.default.removeItem(at: directory(for: material.noteID).appendingPathComponent(name))
         }
     }
@@ -121,6 +126,35 @@ public struct MaterialFiles: Sendable {
 
     public func clear(_ session: StagingSession) {
         try? FileManager.default.removeItem(at: session.directory)
+    }
+
+    /// 删掉 `staging/` 下除 `keeping` 以外的全部会话目录，返回删掉的个数。
+    @discardableResult
+    func clearStaging(keeping: Set<UUID> = []) -> Int {
+        var removed = 0
+        for url in subdirectories(of: stagingDirectory) {
+            if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
+            if (try? FileManager.default.removeItem(at: url)) != nil { removed += 1 }
+        }
+        return removed
+    }
+
+    /// `materials/` 下目录名是 UUID 的子目录：目录名 → 最后修改时间。其他名字不碰。
+    func noteDirectories() -> [UUID: Date] {
+        var result: [UUID: Date] = [:]
+        for url in subdirectories(of: materialsDirectory) {
+            guard let id = UUID(uuidString: url.lastPathComponent) else { continue }
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            result[id] = modified ?? .distantPast
+        }
+        return result
+    }
+
+    private func subdirectories(of folder: URL) -> [URL] {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: []
+        )) ?? []
+        return urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
     }
 
     private func uniqueURL(for name: String, in folder: URL) -> URL {

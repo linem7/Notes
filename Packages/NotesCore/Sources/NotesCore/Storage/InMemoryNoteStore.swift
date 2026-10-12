@@ -42,18 +42,27 @@ public actor InMemoryNoteStore: NoteStoring {
     }
 
     public func insert(notes newNotes: [Note], materials newMaterials: [Material]) throws {
-        for note in newNotes where notes[note.id] != nil { throw NoteStoreError.duplicateID(note.id) }
-        for material in newMaterials where materials[material.id] != nil { throw NoteStoreError.duplicateID(material.id) }
+        var noteIDs = Set(notes.keys)
+        for note in newNotes {
+            guard noteIDs.insert(note.id).inserted else { throw NoteStoreError.duplicateID(note.id) }
+        }
+        var materialIDs = Set(materials.keys)
+        for material in newMaterials {
+            guard noteIDs.contains(material.noteID) else { throw NoteStoreError.noteNotFound(material.noteID) }
+            guard materialIDs.insert(material.id).inserted else { throw NoteStoreError.duplicateID(material.id) }
+        }
         for note in newNotes { notes[note.id] = note }
         for material in newMaterials { materials[material.id] = material }
         publish()
     }
 
     public func update(_ note: Note) throws {
-        guard notes[note.id] != nil else { throw NoteStoreError.noteNotFound(note.id) }
-        var note = note
-        note.updatedAt = clock()
-        notes[note.id] = note
+        guard var stored = notes[note.id] else { throw NoteStoreError.noteNotFound(note.id) }
+        stored.title = note.title
+        stored.due = note.due
+        stored.detail = note.detail
+        stored.updatedAt = clock()
+        notes[note.id] = stored
         publish()
     }
 
