@@ -78,7 +78,9 @@ public final class QuickAddStore {
     public var canSave: Bool {
         guard !isOrganizing, !isSaving else { return false }
         if drafts.isEmpty { return hasInput }
-        return drafts.contains(where: \.isSelected)
+        let selected = drafts.filter(\.isSelected)
+        // 每个勾选的 Draft 都要有 Title
+        return !selected.isEmpty && selected.allSatisfy { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     private var hasInput: Bool {
@@ -92,6 +94,7 @@ public final class QuickAddStore {
     private let makeIntake: @Sendable () throws -> any QuickAddIntaking
     private weak var highlighter: (any NoteHighlighting)?
     private let pendingTimeout: Duration
+    private let saveTimeout: Duration
     private let linkDetectionDelay: Duration
     private let now: @Sendable () -> Date
 
@@ -114,6 +117,7 @@ public final class QuickAddStore {
         makeIntake: @escaping @Sendable () throws -> any QuickAddIntaking,
         highlighter: (any NoteHighlighting)? = nil,
         pendingTimeout: Duration = .seconds(30),
+        saveTimeout: Duration = .seconds(60),
         linkDetectionDelay: Duration = .milliseconds(800),
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -122,6 +126,7 @@ public final class QuickAddStore {
         self.makeIntake = makeIntake
         self.highlighter = highlighter
         self.pendingTimeout = pendingTimeout
+        self.saveTimeout = saveTimeout
         self.linkDetectionDelay = linkDetectionDelay
         self.now = now
     }
@@ -361,8 +366,11 @@ public final class QuickAddStore {
         let request = QuickAddSaveRequest(entries: entries, sourceText: inputText, materials: currentItems, now: now())
 
         do {
-            let ids = try await saver.save(request)
-            clear()
+            let saver = saver
+            // 复制大文件可能慢，但不能无限等：到点按失败处理，可以重试
+            // （那次写入可能还在后台提交，重试可能产生重复，这是取舍）
+            let ids = try await withTimeout(saveTimeout) { try await saver.save(request) }
+            reset()
             highlighter?.highlight(noteIDs: ids)
             onDidSave?()
         } catch {
@@ -372,8 +380,14 @@ public final class QuickAddStore {
 
     // MARK: 清空
 
-    /// 回到空白：取消一切，删 staging。保存成功后也走这里。
+    /// 回到空白：取消一切，删 staging。保存中不能清（会删掉正在复制的 staging），直接忽略。
     public func clear() {
+        guard !isSaving else { return }
+        reset()
+    }
+
+    /// 无条件回到空白；保存成功后也走这里。
+    private func reset() {
         organizeGeneration += 1
         organizeTask?.cancel()
         organizeTask = nil

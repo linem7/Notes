@@ -71,9 +71,12 @@ final class FakeSaver: QuickAddSaving, @unchecked Sendable {
     private var _requests: [QuickAddSaveRequest] = []
     var requests: [QuickAddSaveRequest] { lock.withLock { _requests } }
     var error: (any Error)?
+    /// 非 nil 时 save 一直不返回（也不理会取消），直到放行。
+    var hang: Gate?
 
     func save(_ request: QuickAddSaveRequest) async throws -> [UUID] {
         lock.withLock { _requests.append(request) }
+        if let hang { while !hang.isOpen { try? await Task.sleep(for: .milliseconds(5)) } }
         if let error { throw error }
         return request.entries.map { _ in UUID() }
     }

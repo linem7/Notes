@@ -3,6 +3,7 @@ import Testing
 @testable import NotesCore
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct QuickAddStoreTests {
     @MainActor
     final class Env {
@@ -12,12 +13,12 @@ struct QuickAddStoreTests {
         let highlighter = FakeHighlighter()
         let store: QuickAddStore
 
-        init(pendingTimeout: Duration = .seconds(5)) {
+        init(pendingTimeout: Duration = .seconds(5), saveTimeout: Duration = .seconds(5)) {
             let intake = FakeIntake()
             self.intake = intake
             store = QuickAddStore(
                 organizer: organizer, saver: saver, makeIntake: { intake },
-                pendingTimeout: pendingTimeout, linkDetectionDelay: .milliseconds(1),
+                pendingTimeout: pendingTimeout, saveTimeout: saveTimeout, linkDetectionDelay: .milliseconds(1),
                 now: { Date(timeIntervalSince1970: 1_000) }
             )
             store.setHighlighter(highlighter)
@@ -331,6 +332,51 @@ struct QuickAddStoreTests {
         #expect(env.store.canSave == false)
         await env.store.save()
         #expect(env.saver.requests.isEmpty)
+    }
+
+    @Test func saveTimesOutWhenSaverNeverReturnsAndCanRetry() async {
+        let env = Env(saveTimeout: .milliseconds(40))
+        let gate = Gate()
+        env.saver.hang = gate
+        env.store.inputText = "x"
+        await env.store.save()
+        #expect(env.store.saveFailed)
+        #expect(env.store.isSaving == false)
+        #expect(env.store.inputText == "x")
+        #expect(env.highlighter.highlighted.isEmpty)
+        gate.open()
+        env.saver.hang = nil
+        await env.store.save()
+        #expect(env.saver.requests.count == 2)
+        #expect(env.store.hasContent == false)
+    }
+
+    @Test func clearIsIgnoredWhileSaving() async {
+        let env = Env()
+        env.intake.delays = ["a.pdf": .milliseconds(80)]
+        env.store.addFiles([url("a.pdf")])
+        env.store.inputText = "x"
+        let saving = Task { await env.store.save() }
+        await waitUntil { env.store.isSaving }
+        env.store.clear()
+        #expect(env.store.inputText == "x")
+        #expect(env.intake.discarded == false)
+        await saving.value
+        #expect(env.saver.requests.count == 1)
+    }
+
+    @Test func draftWithBlankTitleCannotBeSaved() async {
+        let env = Env()
+        env.store.inputText = "x"
+        env.store.organize()
+        await waitUntil { env.store.phase == .drafts }
+        #expect(env.store.canSave)
+        env.store.drafts[0].title = "   "
+        #expect(env.store.canSave == false)
+        // 取消勾选后不再卡住保存
+        env.store.drafts[0].isSelected = false
+        env.store.drafts.append(Draft(title: "Ok", materialIndices: []))
+        #expect(env.store.canSave)
     }
 
     @Test func saveFailureKeepsEverything() async {

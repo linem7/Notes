@@ -6,7 +6,7 @@ import NotesCore
 /// ```swift
 /// let store = QuickAddFactory.makeStore(files:…, noteStore:…, fetcher:…, organizer:…)
 /// let controller = QuickAddController(store: store, context: context)
-/// store.setHighlighter(boardController)
+/// store.setHighlighter(boardController)  // BoardController 遵守 NoteHighlighting
 /// Hotkey.install { controller.toggle() }
 /// ```
 ///
@@ -28,8 +28,4 @@ enum QuickAddFactory {
     }
 }
 
-/// 占位：#8 合并后，`BoardController` 直接声明 `NoteHighlighting` 即可（它已经有 `highlight(noteIDs:)`）。
-@MainActor
-final class BoardHighlighterPlaceholder: NoteHighlighting {
-    func highlight(noteIDs: [UUID]) {}
-}
+extension BoardController: NoteHighlighting {}

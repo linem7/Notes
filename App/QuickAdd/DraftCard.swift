@@ -59,8 +59,11 @@ private struct FlowChips: View {
 }
 
 /// Due Date：没有时显示「Add Due Date」，有时是日期选择器加可选的时间，可以清除。
+/// 日期和 "yyyy-MM-dd" / "HH:mm" 的互转用 NotesCore 的 `DueDate`，日历跟随系统当前设置。
 private struct DueDateRow: View {
     @Binding var due: DueDate?
+
+    private var calendar: Calendar { .autoupdatingCurrent }
 
     var body: some View {
         if let current = due {
@@ -88,38 +91,25 @@ private struct DueDateRow: View {
             }
             .font(.system(size: 12))
         } else {
-            Button("Add Due Date") { due = DueDate(day: DueDateFormat.day.string(from: Date())) }
-                .buttonStyle(.link)
-                .font(.system(size: 12))
+            Button("Add Due Date") {
+                due = DueDate(date: Date(), includesTime: false, calendar: calendar)
+            }
+            .buttonStyle(.link)
+            .font(.system(size: 12))
         }
     }
 
     private func dayBinding(_ current: DueDate) -> Binding<Date> {
         Binding(
-            get: { DueDateFormat.day.date(from: current.day) ?? Date() },
-            set: { due?.day = DueDateFormat.day.string(from: $0) }
+            get: { current.date(calendar: calendar) ?? Date() },
+            set: { due?.day = DueDate(date: $0, includesTime: false, calendar: calendar).day }
         )
     }
 
     private func timeBinding(_ current: DueDate) -> Binding<Date> {
         Binding(
-            get: { current.time.flatMap { DueDateFormat.time.date(from: $0) } ?? Date() },
-            set: { due?.time = DueDateFormat.time.string(from: $0) }
+            get: { current.date(calendar: calendar) ?? Date() },
+            set: { due?.time = DueDate(date: $0, includesTime: true, calendar: calendar).time }
         )
-    }
-}
-
-/// DueDate 的 "yyyy-MM-dd" / "HH:mm" 和 Date 互转，按本地日历和时区（不随时区漂移）。
-private enum DueDateFormat {
-    static let day = make("yyyy-MM-dd")
-    static let time = make("HH:mm")
-
-    private static func make(_ format: String) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = .current
-        formatter.dateFormat = format
-        return formatter
     }
 }

@@ -36,10 +36,16 @@ struct QuickAddView: View {
             Text("Quick Add")
                 .font(.system(size: 13, weight: .semibold))
             Spacer(minLength: 0)
-            Text(verbatim: context.modelLabel ?? "—")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            Group {
+                if let label = context.modelLabel {
+                    Text(verbatim: label)
+                } else {
+                    Text("No Connection")
+                }
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
         .padding(EdgeInsets(top: 12, leading: 14, bottom: 10, trailing: 14))
         .contentShape(Rectangle())
@@ -103,6 +109,8 @@ struct QuickAddView: View {
             }
         }
         .padding(EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))
+        // 保存中（包括等网页）不能再改输入，也不能 Clear
+        .disabled(store.isSaving)
     }
 
     // MARK: Draft 区

@@ -271,6 +271,16 @@
         }
       }
     },
+    "No Connection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有 Connection"
+          }
+        }
+      }
+    },
     "No Date" : {
       "localizations" : {
         "zh-Hans" : {
