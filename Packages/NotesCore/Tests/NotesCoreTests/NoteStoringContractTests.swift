@@ -309,8 +309,9 @@ struct NoteStoringContractTests {
         let consumer = Task {
             for await _ in stream { await received.increment() }
         }
+        // 先等初始值：observe 只保留最新值，初始值和插入后的值不等的话会被合并成一次
+        try await received.waitUntilAtLeast(1)
         try await f.store.insert(notes: [note("n")], materials: [])
-        // 初始值 + 一次插入
         try await received.waitUntilAtLeast(2)
         consumer.cancel()
         await consumer.value    // 取消后 for-await 结束；不结束这里会一直挂着
