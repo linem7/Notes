@@ -11,3 +11,6 @@ xcuserdata/
 Package.resolved
 
 .DS_Store
+
+# 团队编排和本地 Claude 配置，不提交
+.claude/

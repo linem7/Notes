@@ -62,4 +62,4 @@ codesign --verify --deep --strict /Applications/Notes.app \
 
 step "启动"
 open /Applications/Notes.app || fail "启动失败：试试在 Finder 里打开 /Applications/Notes.app。"
-echo "✓ 已安装。Notes 在菜单栏里，按 option+N 唤起。"
+echo "✓ 已安装。Notes 在菜单栏里。"
