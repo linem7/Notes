@@ -2,7 +2,9 @@ import Foundation
 import Testing
 @testable import NotesCore
 
-/// 文本类用例在 Linux 上也能跑；PDF 和 OCR 依赖 PDFKit、Vision，只在 Apple 平台上跑（CI）。
+/// 文本类用例在非 Apple 平台也能跑；PDF 和 OCR 靠 `#if canImport(PDFKit)` / Vision 隔着，
+/// **任何 Apple 平台都跑**（本机 macOS 和 CI 都跑），不限于 CI。
+/// 注意：PDFKit / Vision 的输出随系统版本变，那些用例的断言不能依赖具体词被认对（见 `ImageOCRTests`）。
 struct MaterialIntakeTests {
     private let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("MaterialIntakeTests-\(UUID().uuidString)", isDirectory: true)
@@ -104,6 +106,24 @@ struct MaterialIntakeTests {
         #expect(try await readable("a.txt", bytes) == .ready("中文 text"))
     }
 
+    #if canImport(Darwin)
+    /// UTF-8 解不开时交给系统的编码检测（ARCHITECTURE §5 的「系统编码检测」，GBK、Shift_JIS 这类旧文件）。
+    /// 具体识别成哪个编码由 `NSString.stringEncoding` 决定、会随系统版本变，所以只断言「解出来了、中文没坏」。
+    @Test func legacyEncodingsAreDecodedWhenTextIsNotUTF8() async throws {
+        // 「这份文件是很久以前用 GBK 编码保存的旧资料。」的 GB18030 字节：没有 NUL，也不是合法 UTF-8
+        let bytes: [UInt8] = [
+            0xD5, 0xE2, 0xB7, 0xDD, 0xCE, 0xC4, 0xBC, 0xFE, 0xCA, 0xC7, 0xBA, 0xDC, 0xBE, 0xC3,
+            0xD2, 0xD4, 0xC7, 0xB0, 0xD3, 0xC3, 0x20, 0x47, 0x42, 0x4B, 0x20, 0xB1, 0xE0, 0xC2,
+            0xEB, 0xB1, 0xA3, 0xB4, 0xE6, 0xB5, 0xC4, 0xBE, 0xC9, 0xD7, 0xCA, 0xC1, 0xCF, 0xA1, 0xA3,
+        ]
+        guard case .ready(let text) = try await readable("旧资料.txt", bytes) else {
+            Issue.record("不是 ready"); return
+        }
+        #expect(text.contains("这份文件"))
+        #expect(text.contains("GBK"))
+    }
+    #endif
+
     @Test func binaryFilesAreNotReadable() async throws {
         // .docx 是 zip，里面有 NUL 字节
         let state = try await readable("报告.docx", [0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x00, 0x00])
@@ -198,7 +218,8 @@ struct MaterialIntakeTests {
 }
 
 #if canImport(PDFKit)
-/// 只在 Apple 平台上跑（CI）。Fixtures/text.pdf 和 Fixtures/scanned.pdf 是手写的最小 PDF：
+/// 靠 `#if canImport(PDFKit)` 隔着：**任何 Apple 平台都跑**（本机 macOS 和 CI 都跑），不限于 CI。
+/// Fixtures/text.pdf 和 Fixtures/scanned.pdf 是手写的最小 PDF：
 /// 前者有一行文字 "Hello PDF"，后者是一个空白页，模拟扫描版。
 @Suite(.timeLimit(.minutes(1)))
 struct PDFIntakeTests {

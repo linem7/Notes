@@ -274,6 +274,36 @@ struct OpenAICompatibleClientTests {
             == .object(["effort": .string("medium")]))
     }
 
+    @Test func mandatoryReasoningWithoutSupportedEffortsSendsNoReasoningField() async throws {
+        // 关不掉思考、但接口没报支持的档位：什么都不发，而不是发一个会被拒的档位
+        let mandatory = ModelInfo(
+            id: "vendor/must-reason",
+            providerData: .object(["reasoning": .object(["mandatory": .bool(true)])])
+        )
+        // 关得掉的（mandatory 不是 true）无论有没有报档位都直接关掉
+        let optional = ModelInfo(
+            id: "vendor/optional-reason",
+            providerData: .object(["reasoning": .object([
+                "mandatory": .bool(false),
+                "supported_efforts": .array([.string("high")]),
+            ])])
+        )
+        var connection = Connection.openRouter()
+        connection.models = [mandatory, optional]
+
+        #expect(try await sentFields(connection, modelID: "vendor/must-reason")["reasoning"] == nil)
+        #expect(try await sentFields(connection, modelID: "vendor/optional-reason")["reasoning"]
+            == .object(["enabled": .bool(false)]))
+    }
+
+    @Test func listModelsTreatsNullReasoningAsNoInfo() async throws {
+        // `/models` 里显式写着 "reasoning": null，等价于没报：不要塞进 providerData 当成有信息
+        let body = "{\"data\": [{\"id\": \"m\", \"reasoning\": null}, {\"id\": \"n\"}]}"
+        let models = try await OpenAICompatibleClient(transport: StubTransport(body: body))
+            .listModels(connection: .openRouter(), apiKey: "sk-test")
+        #expect(models == [ModelInfo(id: "m"), ModelInfo(id: "n")])
+    }
+
     @Test(arguments: [
         "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
