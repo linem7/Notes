@@ -15,8 +15,11 @@ final class FakeIntake: QuickAddIntaking, @unchecked Sendable {
     var stubborn: Set<String> = []
     /// 这些名字的 prepare 先睡这么久再返回结果。
     var delays: [String: Duration] = [:]
-    private var _released = false
-    func release() { lock.withLock { _released = true } }
+    /// `stubborn` 的放行开关：闸门而不是循环查布尔值 —— 等待期间必须真的挂起。
+    private let released = Gate()
+    func release() { released.open() }
+    /// 测试用：闸门被查看过几次。取消之后这个数还在涨，就是退化成忙等了。
+    var releaseReads: Int { released.reads }
     private var _cancelled: Set<String> = []
     var cancelledNames: Set<String> { lock.withLock { _cancelled } }
 
@@ -32,7 +35,9 @@ final class FakeIntake: QuickAddIntaking, @unchecked Sendable {
     func prepare(_ material: StagedMaterial) async -> PreparedText {
         let key = material.url?.absoluteString ?? material.displayName
         if stubborn.contains(key) {
-            while !lock.withLock({ _released }) { try? await Task.sleep(for: .milliseconds(5)) }
+            // 不理会取消（直到 `release()`），但不能忙等：取消之后 `Task.sleep` 会立刻抛，
+            // `try?` 吞掉就变成不挂起的紧忙等，占死协作线程。
+            await released.wait()
             return PreparedText(state: .unavailable(.cancelled))
         }
         if let delay = delays[key] {
@@ -76,7 +81,8 @@ final class FakeSaver: QuickAddSaving, @unchecked Sendable {
 
     func save(_ request: QuickAddSaveRequest) async throws -> [UUID] {
         lock.withLock { _requests.append(request) }
-        if let hang { while !hang.isOpen { try? await Task.sleep(for: .milliseconds(5)) } }
+        // 不理会取消（直到开闸），但要真的挂起 —— 同上，忙等会占死协作线程。
+        if let hang { await hang.wait() }
         if let error { throw error }
         return request.entries.map { _ in UUID() }
     }

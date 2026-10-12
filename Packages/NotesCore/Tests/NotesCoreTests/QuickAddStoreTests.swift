@@ -28,7 +28,8 @@ struct QuickAddStoreTests {
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0..<400 {
             if condition() { return }
-            try? await Task.sleep(for: .milliseconds(5))
+            // 取消时直接退出：`try?` 吞掉取消会让循环失去挂起点
+            do { try await Task.sleep(for: .milliseconds(5)) } catch { return }
         }
     }
 
@@ -111,6 +112,58 @@ struct QuickAddStoreTests {
         #expect(env.organizer.calls.first?.materials.first?.prepared.state == .unavailable(.notReadable))
     }
 
+    /// 取消之后的等待必须真的挂起。旧写法 `while !gate { try? await Task.sleep(5ms) }` 一旦被取消，
+    /// `Task.sleep` 立刻抛、`try?` 吞掉，循环失去挂起点 → 紧忙等占死协作线程（CI 整轮测试被钉死就是这么来的）。
+    @Test func cancelledStubbornPrepareStopsPollingTheGate() async {
+        let env = Env(pendingTimeout: .milliseconds(30))
+        env.intake.stubborn = ["stuck.pdf"]
+        env.store.addFiles([url("stuck.pdf")])
+        env.store.organize()
+        // pending 超时 → prepare 被取消，此刻它应该挂在闸门上
+        await waitUntil { env.store.phase == .drafts }
+        let before = env.intake.releaseReads
+        try? await Task.sleep(for: .milliseconds(200))
+        let during = env.intake.releaseReads - before
+        env.intake.release()
+        // 200ms 内最多看一眼闸门；忙等的话这里是几万次
+        #expect(during <= 1, "取消后 200ms 内重查闸门 \(during) 次（应为 ≤ 1；旧的忙等写法这里是 239806 次）")
+    }
+
+    /// 取消之后的等待不得阻止无关的 async 工作推进：起 K = 核数 + 4 个「被取消后仍在等」的桩，
+    /// 再让一个无关的 detached 任务跑一小段 —— 它必须在 1 秒内跑完（旧写法会把协作线程占死）。
+    ///
+    /// 失败形态也要能收场：旧写法下这些等待会把协作池占死，测试体自己都可能一直醒不过来。
+    /// 所以除了正常路径的 `release()`，还有一个挂在 **libdispatch 自己的线程上**（不是协作池）的
+    /// 3 秒兜底开闸 —— 池子被占死时它照样准时开闸，让池子恢复、让断言和 `✘` 打得出来，
+    /// 而不是把整轮测试钉死到 15 分钟超时。
+    /// 兜底松闸只会让 `elapsed` 变**小**，不可能变大：观测到 `elapsed ≥ 1 秒`，
+    /// 只能是「无关工作在 1 秒内确实没跑完」，松闸没帮忙圆谎。
+    @Test func cancelledWaitsDoNotBlockUnrelatedWork() async {
+        let box = FlagBox()
+        let env = Env()
+        let names = (0..<(ProcessInfo.processInfo.activeProcessorCount + 4)).map { "stuck\($0).pdf" }
+        env.intake.stubborn = Set(names)
+        env.store.addFiles(names.map { url($0) })
+        // 取消全部 prepare：它们停在闸门前（旧写法在这里变成忙等）
+        env.store.clear()
+
+        // 兜底开闸：libdispatch 的线程不是协作池，池子被占死时它仍然准时。
+        let intake = env.intake
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { intake.release() }
+
+        let start = Date()
+        Task.detached {
+            var sum = 0
+            for i in 0..<2_000_000 { sum &+= i }
+            box.set(sum != 0)
+        }
+        await waitUntil { box.isSet }
+        let elapsed = Date().timeIntervalSince(start)   // 先取快照
+        intake.release()                                // 再正常开闸
+        #expect(box.isSet)
+        #expect(elapsed < 1.0, "无关任务跑了 \(elapsed) 秒 —— 取消后的等待占了协作线程（旧的忙等写法下这里是一整轮钉死）")
+    }
+
     @Test func saveWaitsForPendingReadableText() async {
         let env = Env()
         env.intake.delays = ["a.pdf": .milliseconds(60)]
@@ -139,8 +192,8 @@ struct QuickAddStoreTests {
         let env = Env()
         let gate = Gate()
         env.organizer.behavior = { _ in
-            // 完全不理会取消，直到测试放行
-            while !gate.isOpen { try? await Task.sleep(for: .milliseconds(5)) }
+            // 完全不理会取消，直到测试放行（挂起等待，不轮询）
+            await gate.wait()
             return [Draft(title: "Late", materialIndices: [])]
         }
         env.store.inputText = "x"
@@ -509,9 +562,52 @@ struct QuickAddStoreTests {
     }
 }
 
+/// 一个线程安全的布尔盒子（跨任务读结果用）。
+final class FlagBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _isSet = false
+    var isSet: Bool { lock.withLock { _isSet } }
+    func set(_ value: Bool) { lock.withLock { _isSet = value } }
+}
+
+/// 手动开关：`wait()` 一直等到 `open()`，等待者真的挂起，不靠睡眠轮询。
+/// 轮询在这里是有害的：等的一方被取消后 `try? await Task.sleep` 立刻抛、循环不再挂起，
+/// 就变成占死协作线程的紧忙等（同 `WebFetchSupportTests` 里那个 `Gate`）。
 final class Gate: @unchecked Sendable {
     private let lock = NSLock()
     private var _open = false
-    var isOpen: Bool { lock.withLock { _open } }
-    func open() { lock.withLock { _open = true } }
+    private var _reads = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    /// 测试用：闸门状态被查看过几次。取消之后这个数还在涨，就是退化成忙等了。
+    var reads: Int { lock.withLock { _reads } }
+
+    var isOpen: Bool {
+        lock.withLock {
+            _reads += 1
+            return _open
+        }
+    }
+
+    func open() {
+        let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            _open = true
+            defer { self.waiters = [] }
+            return self.waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+
+    /// 挂起直到 `open()`。**不看取消**（这些桩要的就是「不理会取消」），但也绝不占线程。
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let alreadyOpen = lock.withLock { () -> Bool in
+                _reads += 1
+                if _open { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if alreadyOpen { continuation.resume() }
+        }
+    }
 }
