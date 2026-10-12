@@ -198,7 +198,8 @@ struct WebFetchSupportTests {
         #expect(try await limiter.withPermit { 7 } == 7)
     }
 
-    @Test func timeoutCancelsASlowOperation() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func timeoutCancelsASlowOperation() async throws {
         let started = ContinuousClock.now
         await #expect(throws: WebFetchError.timedOut) {
             try await withFetchTimeout(.milliseconds(50)) {
@@ -209,7 +210,8 @@ struct WebFetchSupportTests {
         #expect(ContinuousClock.now - started < .seconds(5))
     }
 
-    @Test func fetchTimeoutIsWithTimeoutWithTheFetchErrorType() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func fetchTimeoutIsWithTimeoutWithTheFetchErrorType() async throws {
         #expect(try await withFetchTimeout(.seconds(5)) { 42 } == 42)
         await #expect(throws: WebFetchError.timedOut) {
             try await withFetchTimeout(.milliseconds(50)) { await Self.neverReturns() }
