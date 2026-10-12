@@ -50,11 +50,13 @@ public struct Organizer: Sendable {
             jsonMode: true
         )
         var text = ""
+        var received = 0
         for try await fragment in stream {
             text += fragment
-            onProgress?(text.count)
+            received += fragment.count
+            onProgress?(received)
         }
         try Task.checkCancellation()
-        return OrganizeResponseParser.parse(text, input: input, materialCount: materials.count)
+        return OrganizeResponseParser.parse(text, input: input, materialNames: materials.map(\.name))
     }
 }

@@ -73,4 +73,75 @@ struct OrganizePromptTests {
         ])
         #expect(message.contains("name=\"a&quot;b&lt;c>&amp; d.txt\""))
     }
+
+    // MARK: 默认 prompt
+
+    @Test func defaultPromptHasNoDateLine() {
+        // 日期、星期、时区由 system(now:timeZone:prompt:) 加在最前面，不在可编辑的文字里
+        #expect(!OrganizePrompt.default.contains("Today is"))
+    }
+
+    @Test func defaultPromptCoversTheSpecRules() {
+        let prompt = OrganizePrompt.default
+        for needle in [
+            "starts with a verb",                                   // Title 动词开头
+            "Keep what is needed to act: names, places, numbers, links",  // Detail 留关键信息
+            "Do not retell unrelated chat",
+            "several independent things",                           // 拆分
+            "Sub-steps of one thing belong in its detail",
+            "Never make one up",                                    // 不编 Due Date
+            "Chinese input gives Chinese notes",                    // 语言跟随输入
+            "Example",                                              // 有示例
+        ] {
+            #expect(prompt.contains(needle), "missing \(needle)")
+        }
+        #expect(!prompt.contains("to-do"))    // CONTEXT.md 的 Avoid 列表里没有，但 Note 不叫 to-do
+    }
+
+    @Test func defaultPromptSnapshot() {
+        #expect(OrganizePrompt.default == """
+        You turn what the user gives you into simple, clear notes.
+
+        The user message contains an <input> block (text the user typed or pasted, for example a chat conversation) \
+        and zero or more <material> blocks (files and web pages, numbered from 1). A material marked readable="false" \
+        has no readable text: you only know its name.
+
+        Rules:
+        - Write the notes in the main language of the input: Chinese input gives Chinese notes, English input gives English notes.
+        - title: one sentence that starts with a verb and says what to do.
+        - detail: short Markdown, a few bullet points. Keep what is needed to act: names, places, numbers, links, things to prepare. \
+        Do not retell unrelated chat.
+        - due: the deadline as a date in yyyy-MM-dd, or null. Work out phrases like "next Wednesday" or "tomorrow afternoon" \
+        from today's date given at the top. If the deadline cannot be read from the content, use null. Never make one up.
+        - time: the time of the deadline as HH:mm (24-hour), or null. Only when due is not null.
+        - If the input holds several independent things to do, make one note for each. Sub-steps of one thing belong in its detail.
+        - materials: the numbers of the <material> blocks this note needs. Leave it out or use [] when the note uses all of them.
+
+        Reply with a single JSON object and nothing else, in exactly this shape:
+        {"notes": [{"title": "...", "due": "yyyy-MM-dd" or null, "time": "HH:mm" or null, "detail": "...", "materials": [1, 2]}]}
+
+        Example (today is 2026-10-12, a Monday). Input: "Alex needs the signed contract by Thursday 3pm, email it to alex@example.com"
+        {"notes": [{"title": "Send the signed contract to Alex", "due": "2026-10-15", "time": "15:00", \
+        "detail": "- Sign the contract\\n- Email it to alex@example.com", "materials": []}]}
+
+        Example. Input: "buy milk"
+        {"notes": [{"title": "Buy milk", "due": null, "time": null, "detail": "", "materials": []}]}
+        """)
+    }
+
+    @Test func userMessageOmitsTheInputBlockWhenThereIsNoText() {
+        let message = OrganizePrompt.userMessage(input: "  \n", materials: [
+            PromptMaterial(kind: .file, name: "contract.pdf", text: "Clause 1"),
+        ])
+        #expect(message == """
+        <material index="1" kind="file" name="contract.pdf">
+        Clause 1
+        </material>
+        """)
+        #expect(!message.contains("<input>"))
+    }
+
+    @Test func userMessageKeepsAnEmptyInputBlockOnlyWhenThereIsNothingElse() {
+        #expect(OrganizePrompt.userMessage(input: "", materials: []) == "<input>\n\n</input>")
+    }
 }

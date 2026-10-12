@@ -8,16 +8,17 @@ public enum OrganizeResponseParser {
     /// - Parameters:
     ///   - raw: 模型的完整输出。
     ///   - input: 用户在 Quick Add 里输入的原文，fallback 的 Title 取它的第一行。
-    ///   - materialCount: 传给 Organize 的 Material 数量。
+    ///   - materialNames: 传给 Organize 的 Material 的名字（文件名 / 网页标题），按顺序；它的个数就是 Material 数量。
+    ///     输入没有文字时，fallback 的 Title 取第一个 Material 的名字。
     /// - Returns: 解析出的 Draft；`materialIndices` 已经是从 0 开始、不越界，并且「没写 / 空」已展开成全部。
     ///   JSON 解析失败（含被截断的 JSON）或没有可用的条目时，返回一条 fallback Draft。
-    public static func parse(_ raw: String, input: String, materialCount: Int) -> [Draft] {
-        let allMaterials = Array(0..<max(0, materialCount))
+    public static func parse(_ raw: String, input: String, materialNames: [String] = []) -> [Draft] {
+        let allMaterials = Array(materialNames.indices)
         guard let notes = notes(in: raw), !notes.isEmpty else {
-            return [fallback(raw: raw, input: input, materialIndices: allMaterials)]
+            return [fallback(raw: raw, input: input, materialNames: materialNames)]
         }
         let drafts = notes.compactMap { draft(from: $0, allMaterials: allMaterials) }
-        return drafts.isEmpty ? [fallback(raw: raw, input: input, materialIndices: allMaterials)] : drafts
+        return drafts.isEmpty ? [fallback(raw: raw, input: input, materialNames: materialNames)] : drafts
     }
 
     // MARK: 解析
@@ -46,7 +47,9 @@ public enum OrganizeResponseParser {
     private static func materialIndices(_ value: Any?, allMaterials: [Int]) -> [Int] {
         guard let numbers = value as? [Any] else { return allMaterials }
         let indices = Set(numbers.compactMap { element -> Int? in
-            guard let number = element as? NSNumber, number.doubleValue == number.doubleValue.rounded() else { return nil }
+            // JSON 里的 true / false 在 Foundation 里也是 NSNumber，不能当序号 1 / 0
+            guard let number = element as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  number.doubleValue == number.doubleValue.rounded() else { return nil }
             return number.intValue - 1
         }.filter { allMaterials.contains($0) })
         return indices.isEmpty ? allMaterials : indices.sorted()
@@ -75,15 +78,19 @@ public enum OrganizeResponseParser {
     // MARK: fallback
 
     /// Title = 输入的第一行（最多 80 字符），Detail = 模型原文，挂全部 Material（SPEC §3.3）。
-    private static func fallback(raw: String, input: String, materialIndices: [Int]) -> Draft {
+    /// 输入没有文字时 Title 取第一个 Material 的名字，什么都没有才是 "Untitled"。
+    private static func fallback(raw: String, input: String, materialNames: [String]) -> Draft {
         let firstLine = input
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty } ?? "Untitled"
+            .first { !$0.isEmpty }
+        let title = firstLine
+            ?? materialNames.lazy.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+            ?? "Untitled"
         return Draft(
-            title: String(firstLine.prefix(fallbackTitleLimit)),
+            title: String(title.prefix(fallbackTitleLimit)),
             detail: raw.trimmingCharacters(in: .whitespacesAndNewlines),
-            materialIndices: materialIndices
+            materialIndices: Array(materialNames.indices)
         )
     }
 }

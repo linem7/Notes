@@ -31,7 +31,7 @@ public enum OrganizePrompt {
     /// 内置的 Organize prompt，用户可以在设置里改、恢复默认就是回到这个。当前日期、星期和时区不在这里，
     /// 由 `system(now:timeZone:prompt:)` 加在最前面。
     public static let `default` = """
-    You turn what the user gives you into simple, clear to-do notes.
+    You turn what the user gives you into simple, clear notes.
 
     The user message contains an <input> block (text the user typed or pasted, for example a chat conversation) \
     and zero or more <material> blocks (files and web pages, numbered from 1). A material marked readable="false" \
@@ -74,7 +74,11 @@ public enum OrganizePrompt {
 
     /// 用户消息：`<input>` 加每个 Material 一个 `<material>`（序号从 1 开始）。
     public static func userMessage(input: String, materials: [PromptMaterial]) -> String {
-        var parts = ["<input>\n\(input)\n</input>"]
+        // 只有 Material、没有文字时不写 <input> 块（SPEC §3.3）；两样都没有时才留一个空的，免得消息是空串
+        var parts: [String] = []
+        if !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || materials.isEmpty {
+            parts.append("<input>\n\(input)\n</input>")
+        }
         for (offset, material) in materials.enumerated() {
             var attributes = "index=\"\(offset + 1)\" kind=\"\(material.kind.rawValue)\""
             switch material.kind {

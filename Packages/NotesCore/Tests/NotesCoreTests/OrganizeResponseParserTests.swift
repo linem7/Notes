@@ -3,8 +3,12 @@ import Testing
 @testable import NotesCore
 
 struct OrganizeResponseParserTests {
-    private func parse(_ raw: String, input: String = "first line\nsecond line", materialCount: Int = 0) -> [Draft] {
-        OrganizeResponseParser.parse(raw, input: input, materialCount: materialCount)
+    private func parse(
+        _ raw: String, input: String = "first line\nsecond line", materialCount: Int = 0, materialNames: [String]? = nil
+    ) -> [Draft] {
+        OrganizeResponseParser.parse(
+            raw, input: input, materialNames: materialNames ?? (0..<materialCount).map { "material \($0 + 1)" }
+        )
     }
 
     private let normal = """
@@ -162,5 +166,32 @@ struct OrganizeResponseParserTests {
         #expect(drafts.count == 1)
         #expect(drafts[0].detail == "")
         #expect(drafts[0].materialIndices == [0])
+    }
+
+    // MARK: 只有 Material、没有文字
+
+    @Test func fallbackTitleIsTheFirstMaterialNameWhenTheInputHasNoText() {
+        let drafts = parse("oops", input: "  \n", materialNames: ["contract.pdf", "quote.xlsx"])
+        #expect(drafts.count == 1)
+        #expect(drafts[0].title == "contract.pdf")
+        #expect(drafts[0].materialIndices == [0, 1])
+    }
+
+    @Test func inputTextWinsOverMaterialNamesForTheFallbackTitle() {
+        #expect(parse("oops", input: "Call Alex", materialNames: ["contract.pdf"])[0].title == "Call Alex")
+    }
+
+    @Test func blankMaterialNamesAreSkippedAndNothingAtAllIsUntitled() {
+        #expect(parse("oops", input: "", materialNames: [" ", "b.txt"])[0].title == "b.txt")
+        #expect(parse("oops", input: "", materialNames: [" "])[0].title == "Untitled")
+        #expect(parse("oops", input: "", materialNames: [])[0].title == "Untitled")
+    }
+
+    @Test func jsonBooleansAreNotMaterialNumbers() {
+        // true 在 Foundation 里是 NSNumber(1)，不能当成第 1 个 Material；false 同理
+        let raw = "{\"notes\": [{\"title\": \"T\", \"materials\": [true, 2, false]}]}"
+        #expect(parse(raw, materialCount: 3)[0].materialIndices == [1])
+        let onlyBooleans = "{\"notes\": [{\"title\": \"T\", \"materials\": [true, false]}]}"
+        #expect(parse(onlyBooleans, materialCount: 2)[0].materialIndices == [0, 1])
     }
 }

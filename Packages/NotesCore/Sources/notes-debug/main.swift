@@ -24,7 +24,10 @@ guard arguments.count == 1 else { fail("usage: notes-debug <input-text-file>") }
 guard let apiKey = environment["NOTES_API_KEY"], !apiKey.isEmpty else { fail("NOTES_API_KEY is not set") }
 guard let input = try? String(contentsOfFile: arguments[0], encoding: .utf8) else { fail("can't read \(arguments[0])") }
 
-let baseURL = URL(string: environment["NOTES_BASE_URL"] ?? "https://api.deepseek.com")!
+let baseURLString = environment["NOTES_BASE_URL"] ?? "https://api.deepseek.com"
+guard let baseURL = URL(string: baseURLString), baseURL.scheme != nil, baseURL.host != nil else {
+    fail("NOTES_BASE_URL is not a valid URL: \(baseURLString)")
+}
 let modelID = environment["NOTES_MODEL"] ?? "deepseek-flash"
 let connection = Connection(name: "debug", baseURL: baseURL)
 
