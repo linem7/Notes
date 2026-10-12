@@ -31,6 +31,14 @@ targets:
       - path: App
         excludes:
           - "**/.gitkeep"
+    # 字典类型的 Info.plist 键没法用 INFOPLIST_KEY_*，由 XcodeGen 生成 App/Info.plist（不提交），再和生成的键合并
+    info:
+      path: App/Info.plist
+      properties:
+        # 网页抓取（WKWebView）要能打开 http:// 链接；只放开网页内容，app 自己的请求仍受 ATS 限制。
+        # 抓取用非持久 data store，也没有 JS 桥（ARCHITECTURE §6）
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsInWebContent: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.linem7.Notes

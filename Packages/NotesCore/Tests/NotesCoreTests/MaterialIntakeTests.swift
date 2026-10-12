@@ -184,10 +184,6 @@ struct MaterialIntakeTests {
         }
     }
 
-    @Test func pagesWithoutTextFromTheFetcherAreMappedToPageHasNoText() async throws {
-        #expect(try await webPage(.failure(WebFetchError.noText)).state == .unavailable(.pageHasNoText))
-    }
-
     @Test func webPagesWithoutAFetcherAreUnavailable() async throws {
         let intake = try makeIntake()
         let staged = intake.stage(url: try #require(URL(string: "https://example.com")))

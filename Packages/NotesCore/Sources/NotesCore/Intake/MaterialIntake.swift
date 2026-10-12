@@ -106,9 +106,6 @@ public struct MaterialIntake: Sendable {
             )
         } catch is CancellationError {
             return PreparedText(state: .unavailable(.cancelled))
-        } catch WebFetchError.noText {
-            // 页面加载了但没有正文
-            return PreparedText(state: .unavailable(.pageHasNoText))
         } catch {
             return PreparedText(state: .unavailable(.pageLoadFailed))
         }

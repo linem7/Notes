@@ -25,7 +25,7 @@ struct WebFetchSupportTests {
         let output = WebPageScriptOutput(
             article: .init(title: "Article", text: long(200)), pageTitle: "Page", innerText: "short nav text"
         )
-        let chosen = try #require(WebPageExtraction.choose(output, url: url))
+        let chosen = WebPageExtraction.choose(output, url: url)
         #expect(chosen.text == long(200))
         #expect(chosen.title == "Article")
     }
@@ -34,31 +34,37 @@ struct WebFetchSupportTests {
         let output = WebPageScriptOutput(
             article: .init(title: "Article", text: long(199)), pageTitle: "Page", innerText: "the whole page text"
         )
-        let chosen = try #require(WebPageExtraction.choose(output, url: url))
+        let chosen = WebPageExtraction.choose(output, url: url)
         #expect(chosen.text == "the whole page text")
         #expect(chosen.title == "Page")
     }
 
     @Test func readabilityFailureFallsBackToInnerText() throws {
         let output = WebPageScriptOutput(article: nil, pageTitle: "Page", innerText: "body")
-        #expect(WebPageExtraction.choose(output, url: url)?.text == "body")
+        #expect(WebPageExtraction.choose(output, url: url).text == "body")
     }
 
     @Test func titleFallsBackThroughPageTitleToTheURL() throws {
         let noTitles = WebPageScriptOutput(article: .init(title: " ", text: long(300)), pageTitle: nil, innerText: nil)
-        #expect(WebPageExtraction.choose(noTitles, url: url)?.title == "https://example.com/post")
+        #expect(WebPageExtraction.choose(noTitles, url: url).title == "https://example.com/post")
         let pageOnly = WebPageScriptOutput(article: .init(title: "", text: long(300)), pageTitle: " Page ", innerText: nil)
-        #expect(WebPageExtraction.choose(pageOnly, url: url)?.title == "Page")
+        #expect(WebPageExtraction.choose(pageOnly, url: url).title == "Page")
     }
 
-    @Test func nothingReadableGivesNil() {
-        #expect(WebPageExtraction.choose(WebPageScriptOutput(article: .init(title: "T", text: "  \n "), pageTitle: "P", innerText: "\n\n"), url: url) == nil)
-        #expect(WebPageExtraction.choose(WebPageScriptOutput(), url: url) == nil)
+    @Test func nothingReadableGivesEmptyTextButStillATitle() {
+        let blank = WebPageExtraction.choose(
+            WebPageScriptOutput(article: .init(title: "T", text: "  \n "), pageTitle: "P", innerText: "\n\n"), url: url
+        )
+        #expect(blank.text == "")
+        #expect(blank.title == "P")
+        let nothing = WebPageExtraction.choose(WebPageScriptOutput(), url: url)
+        #expect(nothing.text == "")
+        #expect(nothing.title == "https://example.com/post")
     }
 
     @Test func whitespaceIsTrimmedAndBlankLineRunsCollapse() throws {
         let output = WebPageScriptOutput(innerText: "\n\n  first\n\n\n\n   \nsecond\nthird  \n\n")
-        #expect(WebPageExtraction.choose(output, url: url)?.text == "first\n\nsecond\nthird")
+        #expect(WebPageExtraction.choose(output, url: url).text == "first\n\nsecond\nthird")
     }
 
     @Test func scriptOutputDecodesFromJSONIncludingNullArticle() throws {
@@ -207,5 +213,62 @@ struct WebFetchSupportTests {
         #expect(try await withFetchTimeout(.seconds(5)) { 42 } == 42)
         struct Boom: Error {}
         await #expect(throws: Boom.self) { try await withFetchTimeout(.seconds(5)) { throw Boom() } }
+    }
+
+    // MARK: 超时和取消不依赖 operation 配合
+
+    /// 永远不返回、也不响应取消的等待，模拟页面脚本死循环时的 `callAsyncJavaScript`。
+    private static func neverReturns() async -> Int {
+        await withCheckedContinuation { (_: CheckedContinuation<Int, Never>) in }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func timeoutFiresEvenWhenTheOperationIgnoresCancellation() async throws {
+        let started = ContinuousClock.now
+        await #expect(throws: WebFetchError.timedOut) {
+            try await withFetchTimeout(.milliseconds(100)) { await Self.neverReturns() }
+        }
+        #expect(ContinuousClock.now - started < .seconds(5))
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cancellingTheCallerReturnsAtOnceEvenWhenTheOperationIgnoresCancellation() async throws {
+        let task = Task { try await withFetchTimeout(.seconds(60)) { await Self.neverReturns() } }
+        try await Task.sleep(for: .milliseconds(50))
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aHungFetchIsTimedOutAndItsSlotIsFreed() async throws {
+        let runner = FetchRunner(limit: 1, timeout: .milliseconds(100))
+        await #expect(throws: WebFetchError.timedOut) {
+            try await runner.run { await Self.neverReturns() }
+        }
+        #expect(try await runner.run { 7 } == 7)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cancellingAHungFetchFreesItsSlot() async throws {
+        let runner = FetchRunner(limit: 1, timeout: .seconds(60))
+        let hung = Task { try await runner.run { await Self.neverReturns() } }
+        try await Task.sleep(for: .milliseconds(50))
+        let next = Task { try await runner.run { "next" } }
+        try await Task.sleep(for: .milliseconds(50))
+        hung.cancel()
+        await #expect(throws: CancellationError.self) { try await hung.value }
+        #expect(try await next.value == "next")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func timeQueuedBehindAnotherFetchDoesNotCountTowardsTheTimeout() async throws {
+        // 1 个位置，时限 400 ms，两个任务各要 250 ms：第二个排队 250 ms 再跑 250 ms，总共超过时限，
+        // 但它自己的 250 ms 没超，所以不能超时
+        let runner = FetchRunner(limit: 1, timeout: .milliseconds(400))
+        async let first: Int = runner.run { try await Task.sleep(for: .milliseconds(250)); return 1 }
+        try await Task.sleep(for: .milliseconds(50))
+        async let second: Int = runner.run { try await Task.sleep(for: .milliseconds(250)); return 2 }
+        #expect(try await first == 1)
+        #expect(try await second == 2)
     }
 }
