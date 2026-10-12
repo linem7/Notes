@@ -45,12 +45,13 @@ public struct NotesMaintenance: Sendable {
         do {
             let garbage = files.collectGarbage(referenced: try await store.referencedFileNames(), now: now)
             report.garbageFilesDeleted = garbage.removed
-            if garbage.failed > 0 { report.failedSteps.append("garbageCollection") }
+            // 删不掉和列不出来都算这一步失败（#36）：列不出来时 removed/failed 都是 0，光看它们分不出「没有垃圾」。
+            if garbage.failed > 0 || garbage.listingFailed { report.failedSteps.append("garbageCollection") }
         } catch {
             report.failedSteps.append("garbageCollection")
         }
 
-        let staging: (removed: Int, failed: Int)
+        let staging: (removed: Int, failed: Int, listingFailed: Bool)
         switch mode {
         case .startup:
             staging = files.clearStaging(keeping: [], respectingGracePeriod: false, now: now)
@@ -58,7 +59,7 @@ public struct NotesMaintenance: Sendable {
             staging = files.clearStaging(keeping: keeping, respectingGracePeriod: true, now: now)
         }
         report.stagingDirectoriesDeleted = staging.removed
-        if staging.failed > 0 { report.failedSteps.append("staging") }
+        if staging.failed > 0 || staging.listingFailed { report.failedSteps.append("staging") }
         return report
     }
 }

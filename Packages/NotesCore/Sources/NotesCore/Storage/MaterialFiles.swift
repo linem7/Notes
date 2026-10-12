@@ -109,7 +109,11 @@ public struct MaterialFiles: Sendable {
 
     public struct GarbageReport: Equatable, Sendable {
         public var removed = 0
+        /// 条目列得出来、但删不掉。
         public var failed = 0
+        /// 列举 `files/` 就失败了：目录在，但读不出来（权限 / I/O）。这时循环一次都没进，
+        /// `removed` / `failed` 全是 0 —— 光看那两个数和「没有垃圾」分不开，所以要单独标出来。
+        public var listingFailed = false
         /// 没人引用，但还在宽限期内，这次留着。
         public var keptInGracePeriod = 0
     }
@@ -121,9 +125,19 @@ public struct MaterialFiles: Sendable {
     @discardableResult
     public func collectGarbage(referenced: Set<String>, now: Date = Date()) -> GarbageReport {
         var report = GarbageReport()
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
-        )) ?? []
+        // 目录还不存在 = 还没写过任何文件：没有垃圾，也不是失败。和下面真正的列举失败分开。
+        guard FileManager.default.fileExists(atPath: filesDirectory.path) else { return report }
+        let urls: [URL]
+        do {
+            urls = try FileManager.default.contentsOfDirectory(
+                at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
+            )
+        } catch {
+            // 原来这里是 `try? … ?? []`：列目录失败（权限 / I/O）时循环一次都不进，返回的报告
+            // 和「目录里没有垃圾」一模一样，调用方分不出来（#36）。
+            report.listingFailed = true
+            return report
+        }
         for url in urls where !referenced.contains(url.lastPathComponent) {
             guard Self.isPastGracePeriod(modified: modificationDate(of: url), now: now) else {
                 report.keptInGracePeriod += 1
@@ -165,7 +179,8 @@ public struct MaterialFiles: Sendable {
         try? FileManager.default.removeItem(at: session.directory)
     }
 
-    /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件），返回删掉和失败的个数。
+    /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件），返回删掉、失败，
+    /// 以及列目录本身有没有失败。`listingFailed` 和 `collectGarbage` 的 `GarbageReport.listingFailed` 同义（#36）。
     ///
     /// `respectingGracePeriod`（默认 true）为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟，刚好 10 分钟还算新）之内、
     /// 或者读不到修改时间的条目。
@@ -175,9 +190,16 @@ public struct MaterialFiles: Sendable {
     @discardableResult
     func clearStaging(
         keeping: Set<UUID> = [], respectingGracePeriod: Bool = true, now: Date = Date()
-    ) -> (removed: Int, failed: Int) {
+    ) -> (removed: Int, failed: Int, listingFailed: Bool) {
         var removed = 0, failed = 0
-        let urls = (try? FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)) ?? []
+        // 同 collectGarbage：目录不存在不是失败。
+        guard FileManager.default.fileExists(atPath: stagingDirectory.path) else { return (0, 0, false) }
+        let urls: [URL]
+        do {
+            urls = try FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)
+        } catch {
+            return (0, 0, true)
+        }
         for url in urls {
             if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
             // 带宽限期时：修改时间读不到也留着（和 collectGarbage 一样，宁可晚点清，不删用户的文件）
@@ -189,7 +211,7 @@ public struct MaterialFiles: Sendable {
                 failed += 1
             }
         }
-        return (removed, failed)
+        return (removed, failed, false)
     }
 
     /// 修改时间已经超过宽限期（可以回收 / 清理）。刚好 `garbageGracePeriod` 秒还算新；

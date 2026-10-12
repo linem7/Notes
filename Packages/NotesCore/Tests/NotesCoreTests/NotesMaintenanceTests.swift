@@ -134,6 +134,38 @@ struct NotesMaintenanceTests {
         #expect(report.garbageFilesDeleted == 0)
         #expect(report.expiredNotesDeleted == 0)
     }
+
+    /// 列目录失败也要记进 `failedSteps`（#36）：`files/` 读不出来时 `collectGarbage` 的
+    /// `removed` / `failed` 都是 0，和「目录里没有垃圾」长得一样，只有 `listingFailed` 能分开。
+    /// 用 `0o000`（列都列不出来）和上面那条 `0o500`（列得出、删不掉）配成一对。
+    @Test func anUnlistableFilesDirectoryIsReportedAsAGarbageCollectionFailure() async throws {
+        let f = try StoreFixture(.inMemory)
+        _ = try f.files.writeSourceText("没人引用的文件")
+        let filesPath = f.files.filesDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: filesPath)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: filesPath) }
+
+        let report = await NotesMaintenance(store: f.store, files: f.files).run(.startup)
+
+        #expect(report.failedSteps == ["garbageCollection"])
+        #expect(report.garbageFilesDeleted == 0)
+        #expect(report.expiredNotesDeleted == 0)
+    }
+
+    /// 同一形态在 staging 那一步：`staging/` 读不出来时 `clearStaging` 返回 (0, 0)，
+    /// 和「没有遗留 staging」分不开（#36）。
+    @Test func anUnlistableStagingDirectoryIsReportedAsAStagingFailure() async throws {
+        let f = try StoreFixture(.inMemory)
+        try FileManager.default.createDirectory(at: f.files.stagingDirectory, withIntermediateDirectories: true)
+        let stagingPath = f.files.stagingDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: stagingPath)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: stagingPath) }
+
+        let report = await NotesMaintenance(store: f.store, files: f.files).run(.startup)
+
+        #expect(report.failedSteps == ["staging"])
+        #expect(report.stagingDirectoriesDeleted == 0)
+    }
 }
 
 /// 清理路径用的桩：按需让某几步抛错，其余步骤按空库处理。
