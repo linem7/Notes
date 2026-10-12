@@ -3,6 +3,7 @@ import Testing
 @testable import NotesCore
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct QuickAddStoreTests {
     @MainActor
     final class Env {
