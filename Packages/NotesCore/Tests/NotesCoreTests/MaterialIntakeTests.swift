@@ -179,6 +179,13 @@ struct MaterialIntakeTests {
     @Test func failedFetchesAreUnavailable() async throws {
         #expect(try await webPage(.failure(Boom())).state == .unavailable(.pageLoadFailed))
         #expect(try await webPage(.failure(CancellationError())).state == .unavailable(.cancelled))
+        for error in [WebFetchError.loadFailed, .timedOut, .invalidURL] {
+            #expect(try await webPage(.failure(error)).state == .unavailable(.pageLoadFailed))
+        }
+    }
+
+    @Test func pagesWithoutTextFromTheFetcherAreMappedToPageHasNoText() async throws {
+        #expect(try await webPage(.failure(WebFetchError.noText)).state == .unavailable(.pageHasNoText))
     }
 
     @Test func webPagesWithoutAFetcherAreUnavailable() async throws {
