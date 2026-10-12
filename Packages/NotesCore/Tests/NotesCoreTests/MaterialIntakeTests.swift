@@ -176,9 +176,18 @@ struct MaterialIntakeTests {
         #expect(prepared.snapshotPDF == Data([9]))
     }
 
+    @Test func anEmptyPageKeepsItsTitleAndSnapshot() async throws {
+        // WebPageFetcher 在 Readability 和 innerText 都为空时返回 text: ""，而不是抛错
+        let prepared = try await webPage(.success(WebPageResult(title: " Sign in ", text: "", pdfData: Data([9]))))
+        #expect(prepared == PreparedText(state: .unavailable(.pageHasNoText), title: "Sign in", snapshotPDF: Data([9])))
+    }
+
     @Test func failedFetchesAreUnavailable() async throws {
         #expect(try await webPage(.failure(Boom())).state == .unavailable(.pageLoadFailed))
         #expect(try await webPage(.failure(CancellationError())).state == .unavailable(.cancelled))
+        for error in [WebFetchError.loadFailed, .timedOut, .invalidURL] {
+            #expect(try await webPage(.failure(error)).state == .unavailable(.pageLoadFailed))
+        }
     }
 
     @Test func webPagesWithoutAFetcherAreUnavailable() async throws {
