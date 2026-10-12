@@ -33,6 +33,9 @@ struct OrganizeParserEdgeCaseTests {
         "```{\"notes\":[{\"title\":\"A\"}]}```",               // 没有语言标记
         "  ```JSON  \n{\"notes\":[{\"title\":\"A\"}]}\n  ```  ",
         "```json[{\"title\":\"A\"}]```",                          // 同一行的裸数组
+        "```json\r\n{\"notes\":[{\"title\":\"A\"}]}\r\n```",   // CRLF 换行
+        "```json\r\n{\"notes\":[{\"title\":\"A\"}]}\r\n```\r\n",
+        "```json\r{\"notes\":[{\"title\":\"A\"}]}\r```",         // 只有 CR
     ])
     func step1_fenceMarkersAreRemovedButContentIsNeverDropped(raw: String) {
         #expect(parse(raw).map(\.title) == ["A"])
