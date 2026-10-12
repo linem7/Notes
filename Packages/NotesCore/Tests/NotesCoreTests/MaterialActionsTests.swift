@@ -3,78 +3,59 @@ import Testing
 
 @testable import NotesCore
 
+/// 不依赖 `MaterialFiles` 的目录结构：用闭包假装哪些文件在磁盘上。
 struct MaterialActionsTests {
     private let noteID = UUID()
-    private let root: URL
-    private let files: MaterialFiles
 
-    init() throws {
-        root = FileManager.default.temporaryDirectory.appendingPathComponent("MaterialActionsTests-\(UUID())")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        files = MaterialFiles(root: root)
-    }
-
-    /// 只创建 `existing` 里列出的文件（磁盘上有才算存在）。
-    private func material(
-        _ kind: MaterialKind, url: String? = nil, existing: Set<String> = []
-    ) throws -> Material {
-        let m = Material(
-            noteID: noteID, kind: kind, displayName: "m", storedFile: "stored.bin", url: url,
-            textFile: "text.txt", snapshotFile: "snapshot.pdf")
-        let names = ["stored": "stored.bin", "text": "text.txt", "snapshot": "snapshot.pdf"]
-        for key in existing {
-            try files.write(Data("x".utf8), fileName: names[key]!, noteID: noteID)
+    private func actions(
+        _ kind: MaterialKind, url: String? = nil, existing: Set<MaterialFileRole> = []
+    ) -> MaterialActions {
+        let material = Material(noteID: noteID, kind: kind, displayName: "m", url: url)
+        return MaterialActions(material: material) { role in
+            existing.contains(role) ? URL(fileURLWithPath: "/resolved/\(role)") : nil
         }
-        return m
     }
 
-    @Test func fileOpensStoredCopy() throws {
-        let m = try material(.file, existing: ["stored"])
-        let actions = MaterialActions(material: m, files: files)
-        #expect(actions.primary == files.url(for: m, role: .stored))
-        #expect(actions.primary != nil)
-        #expect(actions.snapshot == nil)
-        #expect(actions.inlineText == nil)
-        #expect(!actions.primaryTogglesInlineText)
+    @Test func fileOpensStoredCopy() {
+        let a = actions(.file, existing: [.stored])
+        #expect(a.primary == URL(fileURLWithPath: "/resolved/stored"))
+        #expect(a.snapshot == nil)
+        #expect(a.inlineText == nil)
+        #expect(!a.primaryTogglesInlineText)
     }
 
-    @Test func fileWithMissingCopyHasNothingToOpen() throws {
-        let actions = MaterialActions(material: try material(.file), files: files)
-        #expect(actions.primary == nil)
+    @Test func fileWithMissingCopyHasNothingToOpen() {
+        #expect(actions(.file).primary == nil)
     }
 
-    @Test func webPageOpensOriginalURLAndOffersSnapshotAndText() throws {
-        let m = try material(.webPage, url: "https://example.com/a?b=1", existing: ["snapshot", "text"])
-        let actions = MaterialActions(material: m, files: files)
-        #expect(actions.primary == URL(string: "https://example.com/a?b=1"))
-        #expect(actions.snapshot == files.url(for: m, role: .snapshot))
-        #expect(actions.snapshot != nil)
-        #expect(actions.inlineText == .text)
+    @Test func webPageOpensOriginalURLAndOffersSnapshotAndText() {
+        let a = actions(.webPage, url: "https://example.com/a?b=1", existing: [.snapshot, .text])
+        #expect(a.primary == URL(string: "https://example.com/a?b=1"))
+        #expect(a.snapshot == URL(fileURLWithPath: "/resolved/snapshot"))
+        #expect(a.inlineText == .text)
     }
 
-    @Test func webPageWithoutSnapshotHidesSnapshotButton() throws {
-        let m = try material(.webPage, url: "https://example.com", existing: ["text"])
-        let actions = MaterialActions(material: m, files: files)
-        #expect(actions.snapshot == nil)
-        #expect(actions.inlineText == .text)
+    @Test func webPageWithoutSnapshotHidesSnapshotButton() {
+        let a = actions(.webPage, url: "https://example.com", existing: [.text])
+        #expect(a.snapshot == nil)
+        #expect(a.inlineText == .text)
     }
 
-    @Test func webPageOnlyOpensHTTP() throws {
-        #expect(MaterialActions(material: try material(.webPage, url: "file:///etc/passwd"), files: files).primary == nil)
-        #expect(MaterialActions(material: try material(.webPage, url: "javascript:alert(1)"), files: files).primary == nil)
-        #expect(MaterialActions(material: try material(.webPage, url: nil), files: files).primary == nil)
-        #expect(MaterialActions(material: try material(.webPage, url: "HTTP://Example.com"), files: files).primary != nil)
+    @Test func webPageOnlyOpensHTTP() {
+        #expect(actions(.webPage, url: "file:///etc/passwd").primary == nil)
+        #expect(actions(.webPage, url: "javascript:alert(1)").primary == nil)
+        #expect(actions(.webPage, url: nil).primary == nil)
+        #expect(actions(.webPage, url: "HTTP://Example.com").primary != nil)
     }
 
-    @Test func sourceExpandsInPlace() throws {
-        let actions = MaterialActions(material: try material(.source, existing: ["stored"]), files: files)
-        #expect(actions.primary == nil)
-        #expect(actions.inlineText == .stored)
-        #expect(actions.primaryTogglesInlineText)
+    @Test func sourceExpandsInPlace() {
+        let a = actions(.source, existing: [.stored])
+        #expect(a.primary == nil)
+        #expect(a.inlineText == .stored)
+        #expect(a.primaryTogglesInlineText)
     }
 
-    @Test func sourceWithMissingFileCannotExpand() throws {
-        let actions = MaterialActions(material: try material(.source), files: files)
-        #expect(actions.inlineText == nil)
+    @Test func sourceWithMissingFileCannotExpand() {
+        #expect(actions(.source).inlineText == nil)
     }
 }

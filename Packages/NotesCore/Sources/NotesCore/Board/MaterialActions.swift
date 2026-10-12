@@ -11,22 +11,28 @@ public struct MaterialActions: Equatable, Sendable {
     /// 点击条目是展开而不是打开（Source）。
     public var primaryTogglesInlineText: Bool
 
+    /// 用 `MaterialFiles.url(for:role:)` 解析文件；不自己拼路径。
     public init(material: Material, files: MaterialFiles) {
+        self.init(material: material) { files.url(for: material, role: $0) }
+    }
+
+    /// `resolve` 在文件不存在时返回 nil。
+    public init(material: Material, resolve: (MaterialFileRole) -> URL?) {
         switch material.kind {
         case .file:
-            primary = files.url(for: material, role: .stored)
+            primary = resolve(.stored)
             snapshot = nil
             inlineText = nil
             primaryTogglesInlineText = false
         case .webPage:
             primary = Self.webURL(material.url)
-            snapshot = files.url(for: material, role: .snapshot)
-            inlineText = files.url(for: material, role: .text) == nil ? nil : .text
+            snapshot = resolve(.snapshot)
+            inlineText = resolve(.text) == nil ? nil : .text
             primaryTogglesInlineText = false
         case .source:
             primary = nil
             snapshot = nil
-            inlineText = files.url(for: material, role: .stored) == nil ? nil : .stored
+            inlineText = resolve(.stored) == nil ? nil : .stored
             primaryTogglesInlineText = true
         }
     }
