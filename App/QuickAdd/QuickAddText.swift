@@ -17,28 +17,6 @@ extension UnavailableReason {
 }
 
 extension ChatError {
-    /// 显示在 Draft 区的错误说明（SPEC §4）。
-    var displayText: String {
-        switch self {
-        case .authentication:
-            String(localized: "The API key is invalid or has expired.")
-        case .rateLimited(let retryAfter):
-            if let retryAfter {
-                String(localized: "Too many requests or out of quota. Try again in \(Int(retryAfter.rounded(.up))) seconds.")
-            } else {
-                String(localized: "Too many requests or out of quota.")
-            }
-        case .overloaded:
-            String(localized: "The service is temporarily unavailable.")
-        case .network:
-            String(localized: "Network connection failed.")
-        case .contextTooLong:
-            String(localized: "The input is too long for this model. Remove some text or files and try again.")
-        case .invalidRequest(let raw), .providerError(let raw):
-            raw
-        }
-    }
-
     /// key 无效时除了重试还给「打开设置」（改好 key 之后回来可以直接重试）。
     var offersOpenSettings: Bool {
         if case .authentication = self { return true }

@@ -1,6 +1,36 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "API Key" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Key"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        }
+      }
+    },
+    "Add Connection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加连接"
+          }
+        }
+      }
+    },
     "Add Due Date" : {
       "localizations" : {
         "zh-Hans" : {
@@ -41,6 +71,86 @@
         }
       }
     },
+    "Add a Connection with the + button, then paste your API key." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点“+”添加连接，然后粘贴 API key。"
+          }
+        }
+      }
+    },
+    "Add a model ID manually" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手动添加模型 ID"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级"
+          }
+        }
+      }
+    },
+    "Alibaba Cloud Model Studio" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阿里云百炼"
+          }
+        }
+      }
+    },
+    "All completed Notes and their Materials will be deleted. This can't be undone." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有已完成的 Note 及其 Material 都会被删除，无法撤销。"
+          }
+        }
+      }
+    },
+    "Allow Notes in System Settings › General › Login Items & Extensions." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“系统设置 › 通用 › 登录项与扩展”中允许 Notes。"
+          }
+        }
+      }
+    },
+    "Base URL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base URL"
+          }
+        }
+      }
+    },
+    "Board Mode" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看板模式"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "zh-Hans" : {
@@ -57,6 +167,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消（⌘.）"
+          }
+        }
+      }
+    },
+    "Choose a Default Model for Organize." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请为 Organize 选择一个默认模型。"
           }
         }
       }
@@ -81,12 +201,32 @@
         }
       }
     },
+    "Connection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接"
+          }
+        }
+      }
+    },
     "Couldn't add this file." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法添加这个文件。"
+          }
+        }
+      }
+    },
+    "Couldn't delete the Notes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法删除 Note。"
           }
         }
       }
@@ -121,12 +261,52 @@
         }
       }
     },
+    "Couldn't relaunch Notes. Quit and open it again to switch the language." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法重新启动 Notes。请退出后再打开，以切换语言。"
+          }
+        }
+      }
+    },
     "Couldn't save" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法保存"
+          }
+        }
+      }
+    },
+    "Couldn't save the API key to the Keychain." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法把 API key 存入钥匙串。"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义"
+          }
+        }
+      }
+    },
+    "Data Folder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据目录"
           }
         }
       }
@@ -141,12 +321,82 @@
         }
       }
     },
+    "Default Model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认模型"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除"
+          }
+        }
+      }
+    },
+    "Delete All Done Notes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除所有已完成的 Note"
+          }
+        }
+      }
+    },
+    "Delete Connection?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除这个连接？"
+          }
+        }
+      }
+    },
+    "Delete Connection…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除连接…"
+          }
+        }
+      }
+    },
+    "Delete all done Notes?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除所有已完成的 Note？"
+          }
+        }
+      }
+    },
+    "Deletes every completed Note and its Materials." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除所有已完成的 Note 及其 Material。"
+          }
+        }
+      }
+    },
+    "Delete…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除…"
           }
         }
       }
@@ -211,6 +461,36 @@
         }
       }
     },
+    "Enter a valid base URL, such as https://…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入有效的 base URL，例如 https://…"
+          }
+        }
+      }
+    },
+    "For the Singapore region, change the host to dashscope-intl.aliyuncs.com." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新加坡地域请把 host 改成 dashscope-intl.aliyuncs.com。"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
+    },
     "Hide Board" : {
       "localizations" : {
         "zh-Hans" : {
@@ -231,6 +511,9 @@
         }
       }
     },
+    "Hotkey" : {
+      "localizations" : {}
+    },
     "Hotkey %@ is used by macOS" : {
       "localizations" : {
         "zh-Hans" : {
@@ -246,7 +529,57 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如果按 Hotkey 没有反应，可能和其他 app 冲突。换一个组合试试。"
+            "value" : "按下 Hotkey 没反应时，可能与其他 app 冲突，换一个组合试试。"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言"
+          }
+        }
+      }
+    },
+    "Launch at Login" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开机启动"
+          }
+        }
+      }
+    },
+    "Model ID" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型 ID"
+          }
+        }
+      }
+    },
+    "Models" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
           }
         }
       }
@@ -276,7 +609,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有 Connection"
+            "value" : "还没有配置连接"
           }
         }
       }
@@ -291,12 +624,32 @@
         }
       }
     },
+    "No models yet. Save to fetch them, or add a model ID below." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有模型。保存即可拉取，或在下方手动添加模型 ID。"
+          }
+        }
+      }
+    },
     "No text was recognized." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有识别出文字。"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
           }
         }
       }
@@ -311,6 +664,16 @@
         }
       }
     },
+    "Notes and their Materials are stored on this Mac only." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note 和 Material 只保存在这台 Mac 上。"
+          }
+        }
+      }
+    },
     "Nothing to do" : {
       "localizations" : {
         "zh-Hans" : {
@@ -321,12 +684,52 @@
         }
       }
     },
-    "On a US keyboard, option+N is normally used to type ñ. While it is the Hotkey, it no longer types." : {
+    "On Desktop" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "美式键盘上 option+N 原本用来输入 ñ。设为 Hotkey 后，这个组合不再输入字符。"
+            "value" : "On Desktop"
+          }
+        }
+      }
+    },
+    "On Desktop keeps the Board behind other windows, like Stickies. On Top keeps it above them." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On Desktop 让看板像便笺一样留在其他窗口后面；On Top 让它始终在其他窗口上方。"
+          }
+        }
+      }
+    },
+    "On Top" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On Top"
+          }
+        }
+      }
+    },
+    "On a US keyboard, %@ normally types a special character such as ñ. While it is the Hotkey, it no longer types." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在美式键盘上，%@ 原本用来输入特殊字符（比如 ñ）。设为 Hotkey 后就不再输入了。"
+          }
+        }
+      }
+    },
+    "Open Login Items" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开登录项"
           }
         }
       }
@@ -347,6 +750,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开设置…"
+          }
+        }
+      }
+    },
+    "Organize Prompt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organize 提示词"
           }
         }
       }
@@ -387,6 +800,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粘贴聊天记录、拖入文件，或直接写下要做的事"
+          }
+        }
+      }
+    },
+    "Paste an API key." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请粘贴 API key。"
+          }
+        }
+      }
+    },
+    "Paste your API key" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴你的 API key"
           }
         }
       }
@@ -451,6 +884,26 @@
         }
       }
     },
+    "Relaunch" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动"
+          }
+        }
+      }
+    },
+    "Relaunch Notes to switch the language." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动 Notes 以切换语言。"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "zh-Hans" : {
@@ -471,12 +924,32 @@
         }
       }
     },
+    "Restore Default" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认"
+          }
+        }
+      }
+    },
     "Retry" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "重试"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
           }
         }
       }
@@ -501,6 +974,16 @@
         }
       }
     },
+    "Save Without Testing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不测试直接保存"
+          }
+        }
+      }
+    },
     "Save this note" : {
       "localizations" : {
         "zh-Hans" : {
@@ -511,12 +994,62 @@
         }
       }
     },
+    "Saved — paste a new key to replace it" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存，粘贴新 key 可替换"
+          }
+        }
+      }
+    },
+    "Saving fetches the model list, which also tests the connection." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存时会拉取模型列表，这同时也是连接测试。"
+          }
+        }
+      }
+    },
     "Saving…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在保存…"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置…"
+          }
+        }
+      }
+    },
+    "Show Board" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示看板"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Finder 中显示"
           }
         }
       }
@@ -547,6 +1080,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "API key 无效或已过期。"
+          }
+        }
+      }
+    },
+    "The Connection and its API key will be removed from this Mac. This can't be undone." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接及其 API key 将从这台 Mac 上移除，无法撤销。"
+          }
+        }
+      }
+    },
+    "The base URL changed. Paste the API key again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "base URL 已更改，请重新粘贴 API key。"
+          }
+        }
+      }
+    },
+    "The input is too long for this model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入内容超出了模型的长度上限。"
           }
         }
       }
@@ -631,6 +1194,16 @@
         }
       }
     },
+    "Today's date and time zone are added at the start automatically." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前日期和时区会自动加在最前面。"
+          }
+        }
+      }
+    },
     "Tomorrow" : {
       "localizations" : {
         "zh-Hans" : {
@@ -646,7 +1219,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请求过多或额度用完。"
+            "value" : "请求过多或额度已用完。"
           }
         }
       }
@@ -656,7 +1229,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请求过多或额度用完。请 %lld 秒后重试。"
+            "value" : "请求过多或额度已用完，请在 %lld 秒后重试。"
           }
         }
       }

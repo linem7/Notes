@@ -9,12 +9,10 @@ extension KeyboardShortcuts.Name {
 /// Hotkey 的注册和冲突检测（SPEC §3.1，移植 Chatbot 的 `Hotkey`，去掉 ⌘ 双击）。
 ///
 /// 只能检测和系统快捷键的冲突。其他 app 用 Carbon 注册的同一组合检测不到，
-/// 所以在设置里 Hotkey 旁边放静态提示（`otherAppsHint`、`optionNHint`）。录制控件归设置页（#10）。
+/// 所以在设置里 Hotkey 旁边放静态提示（`otherAppsHint`）。录制控件归设置页（#10）。
 enum Hotkey {
     static let otherAppsHint: LocalizedStringResource =
         "If nothing happens when you press the Hotkey, it may conflict with another app. Try a different combination."
-    static let optionNHint: LocalizedStringResource =
-        "On a US keyboard, option+N is normally used to type ñ. While it is the Hotkey, it no longer types."
 
     private static let lastWarnedKey = "hotkeyConflictWarnedShortcut"
 

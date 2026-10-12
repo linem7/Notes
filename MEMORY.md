@@ -10,6 +10,7 @@
 - 2026-10-12：团队暂停后恢复；三层结构生效——dev-lead 只管跨部门排序 / 合并 / 维护 #1 / 汇报，frontend / backend / review 三个部门 lead 各自计划、分派、审本部门。
 - 2026-10-12：B 线、C 线改走 `git merge origin/main`，不再 rebase——rebase 已推送过的分支会产生 non-fast-forward，只能 force push，而它是 deny。C 线改为「从远端建 `issue-13-publish` 分支 + merge + fast-forward push」。
 - 2026-10-12：SPEC §2.2（数据库打不开时 Board 内纠错态 + Quick Add 禁止保存）用户定为纳入 v1，另开 issue #33，排在 #9 合并之后。
+- 2026-10-12：#9 已合并（PR #22，squash 到 main 560ebea）；#1 的「真机待验」已收 #9 的 16 条快照；B 线开始 merge origin/main + 接线。
 
 ## 环境（2026-10-12 更正，重要）
 - **开发这台机器是 macOS 27.0、Xcode 27.0、Swift 6.4、XcodeGen 2.46、arm64。** 可以本地跑
