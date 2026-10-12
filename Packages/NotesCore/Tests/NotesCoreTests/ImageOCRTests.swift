@@ -7,7 +7,13 @@ import Testing
 import UniformTypeIdentifiers
 @testable import NotesCore
 
-/// 只在 Apple 平台上跑（CI）：图片和扫描版 PDF 都用 CoreGraphics 现场画出来。
+/// 靠 `#if canImport(Vision)` 隔着：**任何 Apple 平台都跑**（本机 macOS 和 CI macos-26 都跑），不限于 CI。
+/// 图片和扫描版 PDF 都用 CoreGraphics 现场画出来。
+///
+/// **Vision 的输出随系统版本变，别假设两边一致**：同一张渲染出来的 `"Alpha report"`，本机 macOS 27
+/// 认成 `"Alpn"`、CI macos-26 认成 `"Alpha"`。这类用例的断言不能依赖某个词被认对
+/// （`onlyTheFirstPagesOfAScannedPDFAreRecognized` 用「设上限 / 不设上限」两次结果对照就是因为这个）。
+///
 /// 串行 + 时限：Vision 在 CI 虚拟机上卡住时，只让一个测试占住线程，并且 1 分钟后明确失败，不拖死整个任务。
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct ImageOCRTests {
@@ -121,10 +127,16 @@ struct ImageOCRTests {
         try data.write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
+        // 词认成什么样随 Vision 版本变（本机 macOS 27 把 "Alpha" 认成 "Alpn"、"Charlie" 认成 "Chalre"），
+        // 所以「前两页出了字、第三页没出」用两次结果对照说明，不靠某个词被拼对：
+        // 三页各有一处 "report"，数它就等于数 OCR 到了几页。
+        func pagesRead(_ text: String) -> Int { text.components(separatedBy: "report").count - 1 }
         let capped = normalized(try ImageOCR.recognizeText(inPDFAt: url, maxPages: 2))
-        #expect(capped.contains("alpha"))
-        #expect(capped.contains("bravo"))
-        #expect(!capped.contains("charlie"))
+        let everything = normalized(try ImageOCR.recognizeText(inPDFAt: url, maxPages: ImageOCR.maxPDFPages))
+
+        #expect(pagesRead(capped) == 2)      // 前 2 页都 OCR 出了字
+        #expect(pagesRead(everything) == 3)  // 反证：不设上限时第 3 页也读得出来，差的就是这个 cap
+        #expect(!capped.contains("charlie")) // 第 3 页的词没混进来
         #expect(ImageOCR.maxPDFPages == 30)
     }
 
