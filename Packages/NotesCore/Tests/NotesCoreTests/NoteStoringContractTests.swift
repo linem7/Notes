@@ -296,6 +296,21 @@ struct NoteStoringContractTests {
         #expect(f.fileNames().isEmpty)
     }
 
+    /// 「先写文件、再插记录」的另一半（ARCHITECTURE §3.3）：源文件本身读不出来时，复制这一步就失败，
+    /// 同样不能留下记录，也不能留下半个文件。错误类型是 `copyItem` 的实现细节，只断言抛错。
+    @Test(arguments: StoreKind.allCases)
+    func addMaterialWithAnUnreadableSourceThrowsAndWritesNothing(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let n = note("n")
+        try await f.store.insert(notes: [n], materials: [])
+        let missing = f.root.appendingPathComponent("没了.pdf")
+        await #expect(throws: (any Error).self) {
+            try await f.store.addMaterial(noteID: n.id, from: missing)
+        }
+        #expect(f.fileNames().isEmpty)
+        #expect(try await f.store.allNotes().first?.materials.isEmpty == true)
+    }
+
     @Test(arguments: StoreKind.allCases)
     func addingAnExistingRecordThrowsNoteNotFoundAndDuplicateID(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
