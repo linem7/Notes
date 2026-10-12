@@ -40,6 +40,7 @@
   5. **Done**：已完成，默认折叠，标题显示数量。
 - 组内排序：有日期的按 Due Date（再按时间，没有时间的排在同一天有时间的后面）升序；同一时刻按创建时间升序。No Date 按创建时间倒序。Done 按完成时间倒序。
 - 空组不显示。整个 Board 为空时显示空状态：提示按 Hotkey 添加。
+- 启动时数据库打不开（文件损坏等）：不弹窗，Board 上显示「Notes can't open its data」、原因，以及「Show in Finder」「Retry」两个按钮；此时 Quick Add 不能保存。
 - 跨过午夜时自动重新分组（今天变成昨天的要进 Overdue）。
 
 ### 2.3 一条 Note
@@ -52,7 +53,7 @@
     - Source：默认折叠，展开后在原地显示原文（纯文本、可选中复制）。
 - **编辑**：展开后点「Edit」进入编辑：Title 单行、Due Date 日期选择器（可清除、可选时间）、Detail 多行纯文本（Markdown 源码）。可以删除单个 Material，也可以往已有 Note 拖入新的 File。⌘⏎、「Done Editing」或**失焦（点 Board 的别处、切到别的 app）都会保存**；Esc 放弃修改。
 - **展开**：同时只展开一条 Note，展开另一条时前一条收起（正在编辑的先按失焦规则保存）。
-- **保存失败**：数据库写入失败时，界面回到修改前的值，Board 顶部出现一条红色的「Couldn't save」提示，几秒后自动消失；不弹窗。
+- **保存失败**：数据库写入失败时，Board 上的值回到修改前，顶部出现一条红色的「Couldn't save」提示，约 4 秒后自动消失；编辑器保持打开、保留用户的输入，可以再次保存或按 Esc 放弃。不弹窗。
 - **完成**：点勾选框立即进入 Done 区；在 Done 区取消勾选回到原组。
 - **删除**：右键菜单 Delete，或点击选中这一行后按 ⌫（正在编辑文字时 ⌫ 只删字；只是展开不算选中）；不弹确认（同 Chatbot 的删除习惯）。连同 Material 一起删除。
 - **自动清理**：完成超过 **30 天**的 Note 连同 Material 静默删除。app 启动时检查一次，之后每天一次。
@@ -89,7 +90,7 @@
 - **⌘⏎**：
   - 已有 Draft 时，保存所有勾选的 Draft 为 Note，清空面板并隐藏；
   - 还没有 Draft 时，**跳过模型**，直接把输入保存成一条 Note：Title 是输入的第一行（最多 80 字符），Detail 是其余部分，没有 Due Date，所有 Material 都挂上，不生成 Source。
-- 可以改了输入再按 ⏎ 重新 Organize，新结果替换旧 Draft。
+- 可以改了输入再按 ⏎ 重新 Organize：旧 Draft 立即清空（包括对它们的修改），中途取消也不恢复。
 - 保存后 Board 上立刻出现新 Note，并短暂高亮。
 - **Material 和 Draft 的对应**：模型为每条 Draft 指明它用到哪些 Material；没指明的默认全部挂上。每条 Draft 都挂一份 Source（原文）。同一个 File（以及同一份 Source、同一个 Web Page 的正文和快照）挂到多条 Note 时**只存一份**，几条 Note 共用；最后一条用到它的 Note 删除后才删文件。
 - 输入只有 Material、没有文字时也可以 Organize。
@@ -142,7 +143,7 @@
 **General**
 - Hotkey（附冲突检测和 option+N 的静态提示）
 - Language：English / 简体中文
-- Board Mode：On Desktop / On Top
+- Board Mode：On Desktop / On Top（菜单栏或这里切换时，Board 若是隐藏的，会按新模式显示出来）
 - Launch at Login（默认开）
 
 **Connection**

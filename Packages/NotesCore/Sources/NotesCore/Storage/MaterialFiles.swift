@@ -24,7 +24,7 @@ public struct MaterialFiles: Sendable {
         self.root = root
     }
 
-    /// 刚写入的文件在这么久之内不会被 `collectGarbage` 回收。
+    /// 刚写入的文件在这么久之内不会被 `collectGarbage` 回收；`clearStaging(respectingGracePeriod: true)` 也不删这么久之内改过的 staging 条目。
     public static let garbageGracePeriod: TimeInterval = 600
 
     var materialsDirectory: URL { root.appendingPathComponent("materials", isDirectory: true) }
@@ -125,8 +125,7 @@ public struct MaterialFiles: Sendable {
             at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
         )) ?? []
         for url in urls where !referenced.contains(url.lastPathComponent) {
-            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            if now.timeIntervalSince(modified) <= Self.garbageGracePeriod {
+            guard Self.isPastGracePeriod(modified: modificationDate(of: url), now: now) else {
                 report.keptInGracePeriod += 1
                 continue
             }
@@ -166,12 +165,23 @@ public struct MaterialFiles: Sendable {
         try? FileManager.default.removeItem(at: session.directory)
     }
 
-    /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件）。
-    func clearStaging(keeping: Set<UUID> = []) -> (removed: Int, failed: Int) {
+    /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件），返回删掉和失败的个数。
+    ///
+    /// `respectingGracePeriod`（默认 true）为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟，刚好 10 分钟还算新）之内、
+    /// 或者读不到修改时间的条目。
+    /// 默认选安全的一边：忘了传只会清得慢一点，不会删掉用户刚加的文件。24 小时清理用它：清理先读到「正在用的会话」、再来删，这中间用户可能粘贴了文件，Quick Add 新建了会话目录，
+    /// 它不在 `keeping` 里，不能连同用户刚加的文件一起删掉。往会话目录里加文件或删文件都会更新目录的修改时间，
+    /// 所以在用的会话一直算「新」。只有启动时的清理显式传 false：这时不会有活跃的会话，全部清掉。
+    @discardableResult
+    func clearStaging(
+        keeping: Set<UUID> = [], respectingGracePeriod: Bool = true, now: Date = Date()
+    ) -> (removed: Int, failed: Int) {
         var removed = 0, failed = 0
         let urls = (try? FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)) ?? []
         for url in urls {
             if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
+            // 带宽限期时：修改时间读不到也留着（和 collectGarbage 一样，宁可晚点清，不删用户的文件）
+            if respectingGracePeriod, !Self.isPastGracePeriod(modified: modificationDate(of: url), now: now) { continue }
             do {
                 try FileManager.default.removeItem(at: url)
                 removed += 1
@@ -180,6 +190,17 @@ public struct MaterialFiles: Sendable {
             }
         }
         return (removed, failed)
+    }
+
+    /// 修改时间已经超过宽限期（可以回收 / 清理）。刚好 `garbageGracePeriod` 秒还算新；
+    /// 读不到修改时间（nil）当作新的：删错了是丢用户的文件，留着只是晚一点回收。
+    static func isPastGracePeriod(modified: Date?, now: Date) -> Bool {
+        guard let modified else { return false }
+        return now.timeIntervalSince(modified) > garbageGracePeriod
+    }
+
+    private func modificationDate(of url: URL) -> Date? {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
     private func uniqueURL(for name: String, in folder: URL) -> URL {

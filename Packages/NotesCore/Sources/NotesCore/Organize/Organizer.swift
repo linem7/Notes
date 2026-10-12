@@ -77,9 +77,13 @@ public struct Organizer: Sendable {
     static func promptMaterial(_ material: OrganizeMaterial, text: String?) -> PromptMaterial {
         switch material.staged.kind {
         case .webPage:
+            // 空白的页面标题当作没有，回退到 displayName（抓取失败时是 URL）
+            let title = material.prepared.title
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .flatMap { $0.isEmpty ? nil : $0 }
             return PromptMaterial(
-                kind: .webPage, name: material.prepared.title ?? material.staged.displayName,
-                url: material.staged.url?.absoluteString, title: material.prepared.title, text: text
+                kind: .webPage, name: title ?? material.staged.displayName,
+                url: material.staged.url?.absoluteString, title: title, text: text
             )
         case .file, .source:
             return PromptMaterial(kind: .file, name: material.staged.displayName, text: text)

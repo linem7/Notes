@@ -180,6 +180,7 @@ Readable Text……
 - 离屏 `WKWebView`（`WKWebsiteDataStore.nonPersistent()`，不带用户的 cookie），加载 URL，等 `didFinish` 后再等 1 秒给前端渲染，单个链接总超时 20 秒，最多同时抓 2 个。
 - 注入打包的 `Readability.js`，执行 `new Readability(document.cloneNode(true)).parse()`，取 `title` 和 `textContent`；失败或正文少于 200 字符时退回 `document.body.innerText`。
 - PDF 快照：`WKWebView.createPDF(configuration:)`，失败不影响正文。
+- 允许抓取 http:// 页面：Info.plist 设 `NSAppTransportSecurity.NSAllowsArbitraryLoadsInWebContent = YES`（只放开 WebView 内容，用户 2026-10-12 确认）。
 - 结果：`WebPageResult(title, text, pdfData?)`；整体失败时 Material 仍保存 URL，Readable Text 为 unavailable（原因：「Couldn't load the page」）。
 - 需要登录的页面（比如部分微信公众号文章）可能抓到登录页，v1 不处理，只靠「正文太短」退回 innerText。**需要真机核实微信公众号链接的效果。**
 - 在主线程使用 WebKit；对外是 `async` 接口，由 `QuickAddStore` 调用。NotesCore 里定义协议 `WebPageFetching`，App 注入实现，方便测试 Intake 流程。
@@ -213,7 +214,7 @@ Readable Text……
 - **API key**：Keychain service `com.linem7.Notes.apikey`，account 为 Connection ID（移植 `APIKeyStore`）。
 - **开机启动**：`SMAppService.mainApp`（移植）。
 - **普通窗口**（设置）：移植 `RegularWindows`，打开时 `.regular`，关掉后 `.accessory`。
-- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和 `collectGarbage`。`collectGarbage` 对修改时间在 10 分钟内的文件有宽限期：保存 Note 时先写文件再插记录，不能把刚写下、记录还没插入的文件当成无人引用误删。
+- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和 `collectGarbage`。`collectGarbage` 对修改时间在 10 分钟内的文件有宽限期：保存 Note 时先写文件再插记录，不能把刚写下、记录还没插入的文件当成无人引用误删。清理有两种时机（`MaintenanceMode`，调用方必须选）：启动时 `.startup` 清空全部 staging；每 24 小时 `.periodic(keepingStaging:)` 跳过正在使用的会话，并且和 `collectGarbage` 一样，修改时间在 10 分钟之内（刚好 10 分钟还算新）或读不到修改时间的条目都留着。
 
 ## 10. 需要真机核实的事
 

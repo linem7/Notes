@@ -29,7 +29,7 @@ public enum DueDateText {
     /// `due.day` 不是合法的 "yyyy-MM-dd" 时返回 nil。
     public static func display(for due: DueDate, today: Date, calendar: Calendar) -> DueDateDisplay? {
         // 和 BoardSections 用同一个判断：非法日期的 Note 在 No Date 里，不显示日期
-        guard BoardSections.isValidDay(due.day) else { return nil }
+        guard DueDate.isValidDay(due.day) else { return nil }
         let parts = due.day.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
