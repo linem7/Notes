@@ -120,6 +120,78 @@ struct WebFetchSupportTests {
         #expect(try await limiter.withPermit { 2 } == 2)
     }
 
+    private actor Flag {
+        private(set) var isSet = false
+        func set() { isSet = true }
+    }
+
+    /// 最多等 5 秒，条件成立就返回。
+    private func waitUntil(_ condition: () async -> Bool) async throws {
+        for _ in 0..<500 {
+            if await condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        Issue.record("等待超时")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aCancelledQueuedFetchNeverRunsAndTheNextWaiterStillGetsTheSlot() async throws {
+        let limiter = FetchLimiter(limit: 1)
+        let ran = Flag()
+        let holderStarted = Flag()
+        let holder = Task {
+            try await limiter.withPermit {
+                await holderStarted.set()
+                try await Task.sleep(for: .milliseconds(300))
+            }
+        }
+        try await waitUntil { await holderStarted.isSet }
+        let cancelled = Task { try await limiter.withPermit { await ran.set() } }
+        try await Task.sleep(for: .milliseconds(50))
+        let next = Task { try await limiter.withPermit { "next" } }
+        try await Task.sleep(for: .milliseconds(50))
+
+        cancelled.cancel()
+        await #expect(throws: CancellationError.self) { try await cancelled.value }
+        try await holder.value
+        #expect(try await next.value == "next")
+        #expect(await ran.isSet == false)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cancellingARunningFetchFreesItsSlotForTheNextWaiter() async throws {
+        let limiter = FetchLimiter(limit: 1)
+        let started = Flag()
+        let running = Task {
+            try await limiter.withPermit {
+                await started.set()
+                try await Task.sleep(for: .seconds(60))
+            }
+        }
+        try await waitUntil { await started.isSet }
+        let next = Task { try await limiter.withPermit { "next" } }
+        try await Task.sleep(for: .milliseconds(50))
+
+        running.cancel()
+        await #expect(throws: CancellationError.self) { try await running.value }
+        #expect(try await next.value == "next")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aTimedOutFetchFreesItsSlot() async throws {
+        // 和 WebPageFetcher 一样：拿到位置之后才开始算时限
+        let limiter = FetchLimiter(limit: 1)
+        await #expect(throws: WebFetchError.timedOut) {
+            try await limiter.withPermit {
+                try await withFetchTimeout(.milliseconds(50)) {
+                    try await Task.sleep(for: .seconds(60))
+                    return 1
+                }
+            }
+        }
+        #expect(try await limiter.withPermit { 7 } == 7)
+    }
+
     @Test func timeoutCancelsASlowOperation() async throws {
         let started = ContinuousClock.now
         await #expect(throws: WebFetchError.timedOut) {
