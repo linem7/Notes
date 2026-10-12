@@ -17,7 +17,8 @@ struct TimeoutTests {
         await #expect(throws: Boom.self) { try await withTimeout(.seconds(5)) { throw Boom() } }
     }
 
-    @Test func aSlowOperationThatHonoursCancellationTimesOutAndIsCancelled() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func aSlowOperationThatHonoursCancellationTimesOutAndIsCancelled() async throws {
         let started = ContinuousClock.now
         await #expect(throws: TimeoutError.self) {
             try await withTimeout(.milliseconds(50)) {
@@ -45,7 +46,8 @@ struct TimeoutTests {
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
-    @Test func theOperationIsCancelledWhenTheTimeoutFires() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func theOperationIsCancelledWhenTheTimeoutFires() async throws {
         let flag = CancelFlag()
         await #expect(throws: TimeoutError.self) {
             try await withTimeout(.milliseconds(50)) {

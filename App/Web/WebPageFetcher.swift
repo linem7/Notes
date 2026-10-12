@@ -23,8 +23,13 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
     private static let readabilitySource: String? = Bundle.main.url(forResource: "Readability", withExtension: "js")
         .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
 
-    private let webView: WKWebView
+    /// 只有这一个强引用，`teardown` 里置为 nil 才能让 WKWebView 释放（释放时 WebKit 关掉页面、回收 Web Content 进程）。
+    /// 所以 `run` 里不能有指向它的局部变量，也不能 `await` 以它为接收者的 WebKit async 方法（挂起期间会一直持有它）：
+    /// 导航、脚本和 PDF 都用 completion handler 版本，包成自己的 continuation 存在下面，teardown 时统一以取消结束。
+    private var webView: WKWebView?
     private var navigation: CheckedContinuation<Void, any Error>?
+    private var scriptCall: CheckedContinuation<String, any Error>?
+    private var pdfCall: CheckedContinuation<Data, any Error>?
     private var isTornDown = false
 
     private override init() {
@@ -33,7 +38,8 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
         configuration.websiteDataStore = .nonPersistent()
         // 默认的 User-Agent 没有 Safari 标识，有些网站会给降级页或验证页
         configuration.applicationNameForUserAgent = "Version/26.0 Safari/605.1.15"
-        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1_024, height: 768), configuration: configuration)
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1_024, height: 768), configuration: configuration)
+        self.webView = webView
         super.init()
         webView.navigationDelegate = self
     }
@@ -52,10 +58,7 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
     private func run(_ url: URL) async throws -> WebPageResult {
         defer { teardown() }
         if isTornDown { throw CancellationError() }
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            navigation = continuation
-            webView.load(URLRequest(url: url))
-        }
+        try await navigate(to: url)
 
         // didFinish 之后再等一会儿，给靠 JavaScript 渲染的页面时间
         try await Task.sleep(for: WebFetchPolicy.settleDelay)
@@ -68,8 +71,64 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
         return WebPageResult(title: chosen.title, text: chosen.text, pdfData: pdf)
     }
 
+    // MARK: WebKit 调用（completion handler 版本，见 `webView` 的注释）
+
+    private func navigate(to url: URL) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            guard let webView else {
+                continuation.resume(throwing: CancellationError())
+                return
+            }
+            navigation = continuation
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    private func evaluate(_ functionBody: String) async throws -> String {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, any Error>) in
+            guard let webView else {
+                continuation.resume(throwing: CancellationError())
+                return
+            }
+            scriptCall = continuation
+            webView.callAsyncJavaScript(functionBody, arguments: [:], in: nil, in: .defaultClient) { [weak self] result in
+                self?.finishScript(result)
+            }
+        }
+    }
+
     private func makePDF() async throws -> Data {
-        try await webView.pdf(configuration: WKPDFConfiguration())
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, any Error>) in
+            guard let webView else {
+                continuation.resume(throwing: CancellationError())
+                return
+            }
+            pdfCall = continuation
+            webView.createPDF(configuration: WKPDFConfiguration()) { [weak self] result in
+                self?.finishPDF(result)
+            }
+        }
+    }
+
+    private func finishScript(_ result: Result<Any, any Error>) {
+        guard let continuation = scriptCall else { return }
+        scriptCall = nil
+        switch result {
+        case .success(let value):
+            if let json = value as? String {
+                continuation.resume(returning: json)
+            } else {
+                continuation.resume(throwing: WebFetchError.loadFailed)
+            }
+        case .failure:
+            continuation.resume(throwing: WebFetchError.loadFailed)
+        }
+    }
+
+    private func finishPDF(_ result: Result<Data, any Error>) {
+        guard let continuation = pdfCall else { return }
+        pdfCall = nil
+        continuation.resume(with: result)
     }
 
     /// 在 App 自己的 content world 里跑 Readability，页面脚本碰不到它；失败时 article 是 null。
@@ -89,23 +148,25 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
                 innerText: document.body ? document.body.innerText : ""
             });
             """
-        let result = try await webView.callAsyncJavaScript(body, arguments: [:], in: nil, contentWorld: .defaultClient)
-        guard let json = result as? String else { throw WebFetchError.loadFailed }
-        return try WebPageScriptOutput(json: json)
+        return try WebPageScriptOutput(json: try await evaluate(body))
     }
 
     private func teardown() {
         guard !isTornDown else { return }
         isTornDown = true
+        // 还在等的调用统一以取消结束，`run` 随之退出
         finishNavigation(.failure(CancellationError()))
-        webView.stopLoading()
-        webView.navigationDelegate = nil
-        webView.load(URLRequest(url: URL(string: "about:blank")!))
+        scriptCall.take()?.resume(throwing: CancellationError())
+        pdfCall.take()?.resume(throwing: CancellationError())
+        webView?.stopLoading()
+        webView?.navigationDelegate = nil
+        // 先跳到空白页，让页面里的脚本尽早停下；然后放掉最后一个强引用，WKWebView 释放后 WebKit 回收 Web Content 进程
+        webView?.load(URLRequest(url: URL(string: "about:blank")!))
+        webView = nil
     }
 
     private func finishNavigation(_ result: Result<Void, any Error>) {
-        guard let continuation = navigation else { return }
-        navigation = nil
+        guard let continuation = navigation.take() else { return }
         continuation.resume(with: result)
     }
 
@@ -121,5 +182,13 @@ private final class PageLoader: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         finishNavigation(.failure(WebFetchError.loadFailed))
+    }
+}
+
+private extension Optional {
+    /// 取出值并置为 nil。
+    mutating func take() -> Wrapped? {
+        defer { self = nil }
+        return self
     }
 }
