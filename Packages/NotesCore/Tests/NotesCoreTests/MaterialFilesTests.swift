@@ -176,6 +176,50 @@ struct MaterialFilesTests {
     @Test func collectGarbageWithNoFilesDirectoryIsANoOp() throws {
         let files = try makeFiles()
         #expect(files.collectGarbage(referenced: []) == MaterialFiles.GarbageReport())
+        #expect(!files.collectGarbage(referenced: []).listingFailed)   // 目录还不存在，不是列举失败
+        let staging = files.clearStaging(respectingGracePeriod: false)
+        #expect(staging == (removed: 0, failed: 0, listingFailed: false))
+    }
+
+    /// 列目录失败不能长得和「没有垃圾」一样：`removed` / `failed` 都是 0 的时候，只有在报告里
+    /// 单独标出来才分得清（#36）。用权限把目录弄成读不出来 —— 假设测试不是以 root 跑
+    /// （同 `NotesMaintenanceTests.garbageCollectionFailuresAreReportedWithoutThrowing`）。
+    @Test func collectGarbageReportsThatItCouldNotListTheFilesDirectory() throws {
+        let files = try makeFiles()
+        _ = try files.write(Data("x".utf8), ext: "txt")
+        let path = files.filesDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: path) }
+
+        let later = Date().addingTimeInterval(86_400)   // 就算条目不是新的，也不该被误当「没有垃圾」
+        let report = files.collectGarbage(referenced: [], now: later)
+        #expect(report.listingFailed)
+        #expect(report.removed == 0)
+        #expect(report.failed == 0)
+
+        // 正对照：权限一恢复，同一次调用就照常回收 —— 上面的 removed == 0 是列举失败，不是删不掉。
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: path)
+        let after = files.collectGarbage(referenced: [], now: later)
+        #expect(!after.listingFailed)
+        #expect(after.removed == 1)
+    }
+
+    @Test func clearStagingReportsThatItCouldNotListTheStagingDirectory() throws {
+        let files = try makeFiles()
+        _ = try files.makeStagingSession()
+        let path = files.stagingDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: path) }
+
+        let result = files.clearStaging(respectingGracePeriod: false)
+        #expect(result.listingFailed)
+        #expect(result.removed == 0)
+        #expect(result.failed == 0)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: path)
+        let after = files.clearStaging(respectingGracePeriod: false)
+        #expect(!after.listingFailed)
+        #expect(after.removed == 1)
     }
 
     @Test func collectGarbageLeavesStagingAlone() throws {
