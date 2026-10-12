@@ -4,7 +4,27 @@ A macOS desktop task-note app. Pin the board to your desktop, or press **Option 
 
 - 一个固定在桌面的任务便签。按 **Option + N** 唤起，粘贴聊天记录、拖入文件、贴链接或直接输入，模型整理成「标题 + 截止日期 + 要点」的 Note；原始文件、网页快照和原文保存在本地，执行任务时一键打开。
 
-**Status:** v1 in development (project skeleton: menu bar icon + Quit only). See [docs/SPEC.md](docs/SPEC.md) (spec), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (implementation), [CONTEXT.md](CONTEXT.md) (glossary), [docs/adr/](docs/adr/) (decisions).
+## 下载与安装
+
+**v0.1.0（开发中，尚未发布）：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
+
+[下载安装包](https://github.com/linem7/Notes/releases)（TODO：v0.1.0 发布后换成直链） · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Notes/releases)
+
+解压后把 `Notes.app` 拖进 **Applications**。首次打开如被拦截，进入 **System Settings › Privacy & Security › Open Anyway**。应用采用自签名、未经过 Apple 公证；使用时需要自己的 API key。无需安装 Xcode 或创建证书。
+
+## 功能
+
+完整规格见 [docs/SPEC.md](docs/SPEC.md)。
+
+- **Board**：固定在桌面上的单列看板，按 Overdue / Today / Upcoming / No Date / Done 分组；On Desktop（像 Stickies 钉在桌面）或 On Top（始终在最前）。
+- **Quick Add**：按 **Option + N**（可改）从任何 app 唤起，粘贴聊天记录、拖入文件、贴链接或直接输入。
+- **Organize**：模型（默认 DeepSeek，不开思考）整理成 **标题 + 截止日期 + 要点**，一次输入可拆成多条，保存前可逐条修改；⌘⏎ 可跳过模型原样保存。
+- **Material**：原文、文件、网页（正文 + PDF 快照）保存在本地，执行任务时一键打开；PDF、图片（本地 OCR）、文本和网页可被模型读取。
+- 常驻菜单栏，图标旁显示今天到期和已逾期的数量；不发通知、不做提醒、不同步，数据都在本机。
+
+**不做**：系统通知和日历、模型思考和联网搜索、读取 Word / Excel / PPT、搜索和标签、iCloud 同步、自动更新（详见 SPEC §10）。
+
+**Status:** v1 in development. On `main`: NotesCore, the Board, Quick Add (#9, PR #22), the menu bar, Settings and interface language (#10, PR #23), and the Board's data-error state (#33, PR #35). The v0.1.0 feature set is merged; the release package has not been cut yet. See [docs/SPEC.md](docs/SPEC.md) (spec), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (implementation), [CONTEXT.md](CONTEXT.md) (glossary), [docs/adr/](docs/adr/) (decisions).
 
 Requirements: macOS 26+, Apple Silicon, your own API key (DeepSeek or any OpenAI-compatible service).
 
@@ -60,7 +80,7 @@ API key 存在 Keychain 里，Keychain 按签名身份判断访问权限。所�
 
 脚本会依次：检查 Xcode、XcodeGen 和签名证书 → 生成工程 → 构建 Release → 退出正在运行的 Notes → 删掉旧的 `/Applications/Notes.app` 并装上新的 → 校验签名 → 启动。任何一步失败都会停下来，并说明原因。第一次构建要下载依赖，会慢一些。
 
-装好之后，Notes 平时只出现在菜单栏，不占 Dock。工程骨架阶段的 app 只有菜单栏图标和 **Quit Notes**，其余功能按 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §11 逐步加入。
+装好之后，Notes 平时只出现在菜单栏，不占 Dock。
 
 本机构建的 app 没有隔离标记（quarantine），不会被 Gatekeeper 拦下。从 GitHub Release 下载的 app 首次打开如被拦截，需要到 **System Settings › Privacy & Security** 里点 **Open Anyway**（ADR-0004）。
 
@@ -100,7 +120,7 @@ while security delete-generic-password -s com.linem7.Notes.apikey >/dev/null 2>&
 
 - **构建时报找不到签名身份 `Notes Self-Signed`**：证书没有建好，或者 **Code Signing** 没有设成 **Always Trust**。按上面「创建自签名证书」检查，`security find-identity -v -p codesigning` 里要能看到它。
 - **每次重新安装后，Keychain 都要求授权**：说明签名身份变了，例如重建了证书，或者没用脚本、而是用 Xcode 的 **Sign to Run Locally** 构建的。在弹窗里选 **Always Allow** 一次即可；以后一直用同一张证书构建。
-- **按 option+N 没反应**（Hotkey 功能实现后）：可能和别的 app 的快捷键冲突，在 Settings 里换一个 **Hotkey**。
+- **按 option+N 没反应**：可能和别的 app 的快捷键冲突，在 Settings 里换一个 **Hotkey**。
 - **运行脚本时弹出 "Terminal" wants access to control "Notes"**：这是 macOS 的 Automation 授权，脚本要用它退出正在运行的旧版本。点 **Allow** 即可。如果点了 **Don't Allow**，脚本会停下来，提示你从菜单栏手动退出 Notes，退出后再运行一次就行；以后想改，可以到 **System Settings › Privacy & Security › Automation** 里调整。
 
 只跑核心逻辑（NotesCore）的测试：
