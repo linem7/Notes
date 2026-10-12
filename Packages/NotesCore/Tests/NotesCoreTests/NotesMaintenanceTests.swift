@@ -40,7 +40,8 @@ struct NotesMaintenanceTests {
         _ = try f.files.writeSourceText("写了文件但没来得及插记录")
         try f.ageAllFiles()
         let report = await NotesMaintenance(store: f.store, files: f.files).run()
-        #expect(report.garbageFilesDeleted == 1)
+        // 清理的第一步（deleteExpiredDone）已经回收过一次，所以不断言 garbageFilesDeleted 的个数
+        #expect(report.failedSteps.isEmpty)
         #expect(f.fileNames() == [try #require(kept.storedFile)])
     }
 
