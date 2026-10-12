@@ -22,8 +22,8 @@ final class BoardModel {
     @ObservationIgnored private var notes: [NoteWithMaterials] = []
     @ObservationIgnored private var observeTask: Task<Void, Never>?
     @ObservationIgnored private var errorTask: Task<Void, Never>?
-    /// 所有写入排成一队按顺序执行（比如编辑中勾选自己：先 update 再 setDone）。
-    @ObservationIgnored private var writeTail: Task<Void, Never>?
+    /// 所有写入排成一队按顺序执行（比如编辑中勾选自己：先 update 再 setDone），每个写入 10 秒超时。
+    @ObservationIgnored private let writeQueue = SerialWriteQueue(timeout: .seconds(10))
     /// 正在编辑的 NoteEditor 登记的「保存」动作；失焦时调用。
     @ObservationIgnored private var editingCommit: (() -> Void)?
     @ObservationIgnored private let errorDuration: Duration
@@ -194,19 +194,23 @@ final class BoardModel {
         onFailure: @escaping @MainActor () -> Void = {}
     ) {
         let store = store
-        let logger = logger
-        let previous = writeTail
-        writeTail = Task { [weak self] in
-            await previous?.value
-            do {
-                try await work(store)
-                onSuccess()
-            } catch {
-                logger.error("\(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
-                self?.flashSaveError()
-                onFailure()
-            }
+        writeQueue.enqueue({ try await work(store) }) { [weak self] error in
+            await self?.writeFinished(name, error: error, onSuccess: onSuccess, onFailure: onFailure)
         }
+    }
+
+    /// 写入完成（成功、失败或超时）。超时按失败处理：显示错误条，队列继续往下走。
+    private func writeFinished(
+        _ name: String, error: Error?,
+        onSuccess: @MainActor () -> Void, onFailure: @MainActor () -> Void
+    ) {
+        guard let error else {
+            onSuccess()
+            return
+        }
+        logger.error("\(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        flashSaveError()
+        onFailure()
     }
 
     private func flashSaveError() {
