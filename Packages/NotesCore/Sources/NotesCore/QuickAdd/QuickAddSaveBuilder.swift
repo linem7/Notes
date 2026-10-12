@@ -98,9 +98,16 @@ public enum QuickAddSaveBuilder {
     /// 没有 Due Date，所有 Material 都挂上，不生成 Source（SPEC §3.3）。只有 Material 没有文字时用第一个 Material 的名字。
     public static func asIsEntry(input: String, materials: [OrganizeMaterial]) -> QuickAddSaveRequest.Entry? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lines = trimmed.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-        var title = lines.first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
-        var detail = lines.count > 1 ? String(lines[1]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        // "\r\n" 在 Swift 里是一个 Character，不能用 split(separator: "\n")；按 isNewline 切（\n、\r、\r\n 都算）
+        var title: String
+        var detail: String
+        if let newline = trimmed.firstIndex(where: \.isNewline) {
+            title = String(trimmed[..<newline]).trimmingCharacters(in: .whitespacesAndNewlines)
+            detail = String(trimmed[trimmed.index(after: newline)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            title = trimmed
+            detail = ""
+        }
         if title.isEmpty {
             guard let first = materials.first else { return nil }
             title = first.prepared.title ?? first.staged.displayName

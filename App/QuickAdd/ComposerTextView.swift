@@ -43,8 +43,8 @@ final class ComposerNSTextView: NSTextView {
             onAttachFiles?(urls)
             return
         }
-        if pasteboard.string(forType: .string) == nil, let image = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
-            onAttachImage?(image)
+        if pasteboard.string(forType: .string) == nil, let png = Self.pngData(from: pasteboard) {
+            onAttachImage?(png)
             return
         }
         super.paste(sender)
@@ -57,6 +57,13 @@ final class ComposerNSTextView: NSTextView {
             return true
         }
         return super.performDragOperation(sender)
+    }
+
+    /// 剪贴板里的图片转成 PNG：截图工具给 PNG，浏览器「复制图片」常常只有 TIFF，要转一遍再存成 `.png`。
+    private static func pngData(from pasteboard: NSPasteboard) -> Data? {
+        if let png = pasteboard.data(forType: .png) { return png }
+        guard let tiff = pasteboard.data(forType: .tiff) else { return nil }
+        return NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
     }
 
     private static func fileURLs(in pasteboard: NSPasteboard) -> [URL]? {
@@ -74,8 +81,6 @@ struct ComposerTextView: NSViewRepresentable {
     let handle: ComposerHandle
     /// ⏎。
     let onSubmit: () -> Void
-    /// ⌘⏎。
-    let onSaveCommand: () -> Void
     var onAttachFiles: ([URL]) -> Void = { _ in }
     var onAttachImage: (Data) -> Void = { _ in }
 
@@ -148,11 +153,9 @@ struct ComposerTextView: NSViewRepresentable {
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
-            let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-            if modifiers.contains(.shift) {
+            // ⌘⏎ 在 `QuickAddController` 的按键监视里处理，不会走到这里
+            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
                 textView.insertNewlineIgnoringFieldEditor(nil)
-            } else if modifiers.contains(.command) {
-                parent.onSaveCommand()
             } else {
                 parent.onSubmit()
             }

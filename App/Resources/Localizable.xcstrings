@@ -501,6 +501,16 @@
         }
       }
     },
+    "Saving…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在保存…"
+          }
+        }
+      }
+    },
     "Show text" : {
       "localizations" : {
         "zh-Hans" : {

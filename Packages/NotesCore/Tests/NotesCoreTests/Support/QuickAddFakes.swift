@@ -11,6 +11,12 @@ final class FakeIntake: QuickAddIntaking, @unchecked Sendable {
     /// 这些名字的 prepare 永远不返回（直到被取消）。
     var hanging: Set<String> = []
     var failingNames: Set<String> = []
+    /// 这些名字的 prepare 完全不响应取消，直到 `release()`。
+    var stubborn: Set<String> = []
+    /// 这些名字的 prepare 先睡这么久再返回结果。
+    var delays: [String: Duration] = [:]
+    private var _released = false
+    func release() { lock.withLock { _released = true } }
     private var _cancelled: Set<String> = []
     var cancelledNames: Set<String> { lock.withLock { _cancelled } }
 
@@ -25,6 +31,13 @@ final class FakeIntake: QuickAddIntaking, @unchecked Sendable {
 
     func prepare(_ material: StagedMaterial) async -> PreparedText {
         let key = material.url?.absoluteString ?? material.displayName
+        if stubborn.contains(key) {
+            while !lock.withLock({ _released }) { try? await Task.sleep(for: .milliseconds(5)) }
+            return PreparedText(state: .unavailable(.cancelled))
+        }
+        if let delay = delays[key] {
+            try? await Task.sleep(for: delay)
+        }
         if hanging.contains(key) {
             while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
             lock.withLock { _ = _cancelled.insert(key) }

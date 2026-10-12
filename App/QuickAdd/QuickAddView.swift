@@ -56,7 +56,6 @@ struct QuickAddView: View {
                 contentHeight: $composerHeight,
                 handle: composer,
                 onSubmit: { store.organize() },
-                onSaveCommand: { Task { await store.save() } },
                 onAttachFiles: { store.addFiles($0) },
                 onAttachImage: { store.addImageData($0) }
             )
@@ -110,32 +109,52 @@ struct QuickAddView: View {
 
     @ViewBuilder
     private var draftArea: some View {
-        switch store.phase {
-        case .idle:
-            VStack {
-                if store.saveFailed { SaveFailedNotice() }
-                Spacer()
-            }
-        case .organizing(let received):
+        if store.isSaving {
             VStack(spacing: 10) {
                 ProgressView()
-                Group {
-                    if received > 0 {
-                        Text("Organizing… \(received) characters")
-                    } else {
-                        Text("Organizing…")
-                    }
-                }
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                Button("Cancel (⌘.)") { store.cancelOrganize() }
-                    .controlSize(.small)
+                Text("Saving…")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .failed(let failure):
-            failureView(failure)
-        case .drafts:
-            draftList
+        } else {
+            switch store.phase {
+            case .idle:
+                VStack {
+                    if store.saveFailed { SaveFailedNotice() }
+                    Spacer()
+                }
+            case .organizing(let received):
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Group {
+                        if received > 0 {
+                            Text("Organizing… \(received) characters")
+                        } else {
+                            Text("Organizing…")
+                        }
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    Button("Cancel (⌘.)") { store.cancelOrganize() }
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .failed(let failure):
+                if store.drafts.isEmpty {
+                    failureView(failure)
+                } else {
+                    // 重新 Organize 失败时，旧 Draft（和用户的修改）还在
+                    VStack(spacing: 0) {
+                        failureView(failure)
+                            .frame(maxHeight: 130)
+                        Divider()
+                        draftList
+                    }
+                }
+            case .drafts:
+                draftList
+            }
         }
     }
 

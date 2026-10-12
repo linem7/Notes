@@ -1,16 +1,5 @@
 import Foundation
 
-/// 一个已加入 Quick Add 的 Material 和它的 Readable Text（和 `Organizer` 的契约一致）。
-public struct OrganizeMaterial: Hashable, Sendable {
-    public var staged: StagedMaterial
-    public var prepared: PreparedText
-
-    public init(staged: StagedMaterial, prepared: PreparedText) {
-        self.staged = staged
-        self.prepared = prepared
-    }
-}
-
 /// Organize 失败的原因里，App 要单独处理的那一种：没有可用的 Connection / Default Model / key。
 public enum OrganizeSetupError: Error, Equatable, Sendable {
     case noConnection

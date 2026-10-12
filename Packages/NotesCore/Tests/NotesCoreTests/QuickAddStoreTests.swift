@@ -73,23 +73,114 @@ struct QuickAddStoreTests {
         }
     }
 
-    @Test func pendingTimeoutTreatsMaterialAsUnavailable() async {
+    @Test func pendingTimeoutCancelsPrepareAndMarksUnavailable() async {
         let env = Env(pendingTimeout: .milliseconds(30))
-        env.intake.hanging = ["slow.pdf"]
+        env.intake.hanging = ["slow.pdf", "https://slow.example.com/"]
         env.store.addFiles([url("slow.pdf"), url("fast.pdf")])
+        env.store.inputText = "https://slow.example.com/"
+        env.store.detectLinks()
         env.store.organize()
         await waitUntil { env.store.phase == .drafts }
         let materials = env.organizer.calls.first?.materials ?? []
-        #expect(materials.count == 2)
-        #expect(materials[0].prepared.state == .unavailable(.cancelled))
-        // 到点真的取消了还在跑的 prepare，Material 条上也标为 unavailable
-        await waitUntil { env.intake.cancelledNames.contains("slow.pdf") }
-        #expect(env.intake.cancelledNames == ["slow.pdf"])
-        #expect(env.store.items[0].state == .unavailable(.cancelled))
+        guard materials.count == 3 else {
+            Issue.record("expected 3 materials, got \(materials.count)")
+            return
+        }
+        // 文件 → notReadable，网页 → pageLoadFailed；.cancelled 只给用户自己的移除 / 清空
+        #expect(materials[0].prepared.state == .unavailable(.notReadable))
         guard case .ready = materials[1].prepared.state else {
             Issue.record("fast.pdf should be ready")
             return
         }
+        #expect(materials[2].prepared.state == .unavailable(.pageLoadFailed))
+        // 到点真的取消了还在跑的 prepare
+        await waitUntil { env.intake.cancelledNames.count == 2 }
+        #expect(env.intake.cancelledNames == ["slow.pdf", "https://slow.example.com/"])
+        #expect(env.store.items[0].state == .unavailable(.notReadable))
+    }
+
+    @Test func prepareThatIgnoresCancellationStillTimesOutOnTime() async {
+        let env = Env(pendingTimeout: .milliseconds(30))
+        env.intake.stubborn = ["stuck.pdf"]
+        env.store.addFiles([url("stuck.pdf")])
+        env.store.organize()
+        await waitUntil { env.store.phase == .drafts }
+        env.intake.release()
+        #expect(env.store.phase == .drafts)
+        #expect(env.organizer.calls.first?.materials.first?.prepared.state == .unavailable(.notReadable))
+    }
+
+    @Test func saveWaitsForPendingReadableText() async {
+        let env = Env()
+        env.intake.delays = ["a.pdf": .milliseconds(60)]
+        env.intake.results = ["a.pdf": PreparedText(state: .ready("late text"))]
+        env.store.addFiles([url("a.pdf")])
+        env.store.inputText = "note"
+        await env.store.save()
+        guard let request = env.saver.requests.first else {
+            Issue.record("expected a save request")
+            return
+        }
+        #expect(request.materials.first?.prepared.state == .ready("late text"))
+    }
+
+    @Test func saveTimesOutOnStuckPrepareAndStillSaves() async {
+        let env = Env(pendingTimeout: .milliseconds(30))
+        env.intake.stubborn = ["stuck.pdf"]
+        env.store.addFiles([url("stuck.pdf")])
+        env.store.inputText = "note"
+        await env.store.save()
+        env.intake.release()
+        #expect(env.saver.requests.count == 1)
+    }
+
+    @Test func cancelWorksEvenIfOrganizerIgnoresCancellation() async {
+        let env = Env()
+        let gate = Gate()
+        env.organizer.behavior = { _ in
+            // 完全不理会取消，直到测试放行
+            while !gate.isOpen { try? await Task.sleep(for: .milliseconds(5)) }
+            return [Draft(title: "Late", materialIndices: [])]
+        }
+        env.store.inputText = "x"
+        env.store.organize()
+        env.store.cancelOrganize()
+        #expect(env.store.phase == .idle)
+        gate.open()
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(env.store.phase == .idle)
+        #expect(env.store.drafts.isEmpty)
+    }
+
+    @Test func cancelKeepsOldDraftsAndEditsAndFailureToo() async {
+        let env = Env()
+        env.store.inputText = "x"
+        env.store.organize()
+        await waitUntil { env.store.phase == .drafts }
+        env.store.drafts[0].title = "Edited"
+        env.organizer.behavior = { _ in
+            try await Task.sleep(for: .seconds(5))
+            return []
+        }
+        env.store.organize()
+        #expect(env.store.drafts.map(\.title) == ["Edited"])
+        env.store.cancelOrganize()
+        #expect(env.store.phase == .drafts)
+        #expect(env.store.drafts.map(\.title) == ["Edited"])
+
+        env.organizer.behavior = { _ in throw ChatError.network }
+        env.store.organize()
+        await waitUntil { env.store.phase == .failed(.chat(.network)) }
+        #expect(env.store.drafts.map(\.title) == ["Edited"])
+    }
+
+    @Test func stagingSessionIDFollowsTheSession() async {
+        let env = Env()
+        #expect(env.store.currentStagingSessionID == nil)
+        env.store.addFiles([url("a.pdf")])
+        #expect(env.store.currentStagingSessionID == env.intake.sessionID)
+        await env.store.save()
+        #expect(env.store.currentStagingSessionID == nil)
     }
 
     @Test func removingMaterialCancelsItsPrepare() async {
@@ -117,8 +208,7 @@ struct QuickAddStoreTests {
         await waitUntil { env.store.phase == .drafts }
         env.organizer.behavior = { _ in [Draft(title: "New", materialIndices: [])] }
         env.store.organize()
-        #expect(env.store.drafts.isEmpty)
-        await waitUntil { env.store.phase == .drafts }
+        await waitUntil { env.store.drafts.map(\.title) == ["New"] }
         #expect(env.store.drafts.map(\.title) == ["New"])
     }
 
@@ -371,4 +461,11 @@ struct QuickAddStoreTests {
         await waitUntil { env.store.phase == .drafts }
         #expect(env.organizer.calls.first?.materials.count == 1)
     }
+}
+
+final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _open = false
+    var isOpen: Bool { lock.withLock { _open } }
+    func open() { lock.withLock { _open = true } }
 }

@@ -119,6 +119,13 @@ struct QuickAddSaveBuilderTests {
         #expect(entry.materialIndices == [0])
     }
 
+    @Test(arguments: ["买牛奶\r\n还有鸡蛋", "买牛奶\r还有鸡蛋", "买牛奶\n还有鸡蛋", "\r\n买牛奶\r\n还有鸡蛋\r\n"])
+    func asIsHandlesAnyLineEnding(input: String) throws {
+        let entry = try #require(QuickAddSaveBuilder.asIsEntry(input: input, materials: []))
+        #expect(entry.title == "买牛奶")
+        #expect(entry.detail == "还有鸡蛋")
+    }
+
     @Test func asIsLongFirstLineKeepsRestInDetail() throws {
         let line = String(repeating: "a", count: 100)
         let entry = try #require(QuickAddSaveBuilder.asIsEntry(input: line, materials: []))

@@ -249,14 +249,13 @@ public final class QuickAddStore {
 
     // MARK: Organize
 
-    /// ⏎。已有 Draft 时新结果替换旧 Draft。
+    /// ⏎。已有 Draft 时，旧 Draft（包括用户的修改）保留到新结果到达时再替换；失败或取消都保留旧的。
     public func organize() {
         guard canOrganize else { return }
         detectLinks()
         organizeTask?.cancel()
         organizeGeneration += 1
         let generation = organizeGeneration
-        drafts = []
         phase = .organizing(received: 0)
         organizeTask = Task { [weak self] in
             await self?.runOrganize(generation: generation)
@@ -269,14 +268,13 @@ public final class QuickAddStore {
         organizeGeneration += 1
         organizeTask?.cancel()
         organizeTask = nil
-        phase = .idle
+        // 不等底层的请求收尾：晚到的结果被 generation 挡掉
+        phase = drafts.isEmpty ? .idle : .drafts
     }
 
     private func runOrganize(generation: Int) async {
-        await waitForPending()
-        guard generation == organizeGeneration, !Task.isCancelled else { return }
+        guard await waitForPending(), generation == organizeGeneration, !Task.isCancelled else { return }
         let materials = items.map { OrganizeMaterial(staged: $0.staged, prepared: $0.prepared) }
-        organizedMaterials = materials
         let input = inputText
         do {
             let result = try await organizer.organize(input: input, materials: materials) { [weak self] count in
@@ -284,6 +282,7 @@ public final class QuickAddStore {
             }
             guard generation == organizeGeneration, !Task.isCancelled else { return }
             drafts = result
+            organizedMaterials = materials
             phase = .drafts
         } catch is CancellationError {
             return
@@ -304,33 +303,28 @@ public final class QuickAddStore {
         return .chat(.providerError(error.localizedDescription))
     }
 
-    /// 等所有还在准备 Readable Text 的 Material，最多 `pendingTimeout`。到点还没完成的真的取消（释放抓取名额），
-    /// 标为 unavailable，当 readable="false"。
-    private func waitForPending() async {
+    /// 等所有还在准备 Readable Text，整体最多 `pendingTimeout`（SPEC：⏎ 之后最多等 30 秒）。到点还没完成的真的取消
+    /// （释放抓取名额），标为 unavailable：网页 `pageLoadFailed`，文件 `notReadable`，当 readable="false"。
+    /// `.cancelled` 只用在用户自己移除或清空的情况。
+    /// 返回 false 表示调用方被取消（⌘. / Esc / 清空），不用往下走。
+    private func waitForPending() async -> Bool {
         let tasks = items.compactMap { prepareTasks[$0.id] }
-        guard !tasks.isEmpty else { return }
-        let timeout = pendingTimeout
-        let finished = await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
+        guard !tasks.isEmpty else { return true }
+        do {
+            try await withTimeout(pendingTimeout) {
                 for task in tasks { await task.value }
-                return true
             }
-            group.addTask {
-                try? await Task.sleep(for: timeout)
-                return false
+        } catch is TimeoutError {
+            for index in items.indices where items[index].state == .pending {
+                let item = items[index]
+                prepareTasks.removeValue(forKey: item.id)?.cancel()
+                let reason: UnavailableReason = item.staged.kind == .webPage ? .pageLoadFailed : .notReadable
+                items[index].prepared = PreparedText(state: .unavailable(reason))
             }
-            let first = await group.next() ?? false
-            // 到点了：真的取消还在跑的 prepare。不取消的话，等它们的那个子任务不会结束，withTaskGroup 也就不会返回
-            if !first, !Task.isCancelled { for task in tasks { task.cancel() } }
-            group.cancelAll()
-            return first
+        } catch {
+            return false
         }
-        guard !finished, !Task.isCancelled else { return }
-        for index in items.indices where items[index].state == .pending {
-            let id = items[index].id
-            prepareTasks.removeValue(forKey: id)?.cancel()
-            items[index].prepared = PreparedText(state: .unavailable(.cancelled))
-        }
+        return true
     }
 
     // MARK: 保存
@@ -342,7 +336,7 @@ public final class QuickAddStore {
         isSaving = true
         defer { isSaving = false }
         // 网页还在抓时先等它（最多 30 秒），这样正文和快照能一起存下来
-        await waitForPending()
+        guard await waitForPending() else { return }
         let currentItems = items.map { OrganizeMaterial(staged: $0.staged, prepared: $0.prepared) }
         let positions = Dictionary(uniqueKeysWithValues: currentItems.enumerated().map { ($1.staged.id, $0) })
         let hasSource = !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
