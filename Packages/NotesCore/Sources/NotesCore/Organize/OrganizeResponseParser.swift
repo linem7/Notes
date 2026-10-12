@@ -47,7 +47,8 @@ public enum OrganizeResponseParser {
     private static func materialIndices(_ value: Any?, allMaterials: [Int]) -> [Int] {
         guard let numbers = value as? [Any] else { return allMaterials }
         let indices = Set(numbers.compactMap { element -> Int? in
-            // JSON 里的 true / false 在 Foundation 里也是 NSNumber，不能当序号 1 / 0
+            // JSON 里的 true / false 在 Foundation 里也是 NSNumber，不能当序号 1 / 0。
+            // CFBooleanGetTypeID 只在 Darwin 上有；NotesCore 只支持 macOS（Package.swift），CI 也只跑 macOS。
             guard let number = element as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
                   number.doubleValue == number.doubleValue.rounded() else { return nil }
             return number.intValue - 1

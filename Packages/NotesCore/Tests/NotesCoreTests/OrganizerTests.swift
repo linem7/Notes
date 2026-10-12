@@ -238,6 +238,13 @@ struct OrganizerMaterialTests {
         """)
     }
 
+    @Test(arguments: ["", "  \n\t "])
+    func emptyOrBlankReadyTextIsSentAsUnreadable(text: String) async throws {
+        let (user, _) = try await run(input: "x", materials: [file("blank.txt", text: text)])
+        #expect(user.contains("<material index=\"1\" kind=\"file\" name=\"blank.txt\" readable=\"false\"/>"))
+        #expect(!user.contains("</material>"))
+    }
+
     @Test func pendingMaterialsAreSentAsUnreadable() async throws {
         let pending = OrganizeMaterial(
             staged: StagedMaterial(kind: .file, displayName: "slow.pdf"), prepared: PreparedText(state: .pending)

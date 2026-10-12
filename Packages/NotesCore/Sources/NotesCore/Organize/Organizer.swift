@@ -24,10 +24,10 @@ public struct OrganizeMaterial: Hashable, Sendable {
         self.prepared = prepared
     }
 
-    /// 发给模型的 Readable Text；还没准备好或拿不到的是 nil（模型只看到名字）。
+    /// 发给模型的 Readable Text；还没准备好、拿不到、或者只有空白的是 nil（模型只看到名字）。
     var readableText: String? {
-        if case .ready(let text) = prepared.state { return text }
-        return nil
+        guard case .ready(let text) = prepared.state, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
     }
 }
 

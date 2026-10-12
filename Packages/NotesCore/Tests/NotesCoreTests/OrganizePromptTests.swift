@@ -29,7 +29,7 @@ struct OrganizePromptTests {
     @Test func defaultPromptIsEnglishAndDescribesTheOutputFormat() {
         let prompt = OrganizePrompt.default
         #expect(prompt.unicodeScalars.allSatisfy { $0.value < 0x2E80 })
-        for needle in ["\"notes\"", "\"title\"", "\"due\"", "\"time\"", "\"detail\"", "\"materials\"", "main language of the input", "Never make one up"] {
+        for needle in ["\"notes\"", "\"title\"", "\"due\"", "\"time\"", "\"detail\"", "\"materials\"", "main language of the input (or of the materials when there is no input)", "assume today is", "Never make one up"] {
             #expect(prompt.contains(needle), "missing \(needle)")
         }
     }
@@ -107,7 +107,7 @@ struct OrganizePromptTests {
         A material marked readable="false" has no readable text: you only know its name.
 
         Rules:
-        - Write the notes in the main language of the input: Chinese input gives Chinese notes, English input gives English notes.
+        - Write the notes in the main language of the input (or of the materials when there is no input): Chinese input gives Chinese notes, English input gives English notes.
         - title: one sentence that starts with a verb and says what to do.
         - detail: short Markdown, a few bullet points. Keep what is needed to act: names, places, numbers, links, things to prepare. \
         Do not retell unrelated chat.
@@ -120,7 +120,7 @@ struct OrganizePromptTests {
         Reply with a single JSON object and nothing else, in exactly this shape:
         {"notes": [{"title": "...", "due": "yyyy-MM-dd" or null, "time": "HH:mm" or null, "detail": "...", "materials": [1, 2]}]}
 
-        Example (today is 2026-10-12, a Monday). Input: "Alex needs the signed contract by Thursday 3pm, email it to alex@example.com"
+        Example (assume today is 2026-10-12, a Monday; the real date is given at the top). Input: "Alex needs the signed contract by Thursday 3pm, email it to alex@example.com"
         {"notes": [{"title": "Send the signed contract to Alex", "due": "2026-10-15", "time": "15:00", \
         "detail": "- Sign the contract\\n- Email it to alex@example.com", "materials": []}]}
 

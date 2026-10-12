@@ -20,6 +20,15 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
+/// 只打印状态名和字数，不把 Readable Text 全文打到终端里。
+func describe(_ state: ReadableTextState) -> String {
+    switch state {
+    case .pending: "pending"
+    case .ready(let text): "ready (\(text.count) characters)"
+    case .unavailable(let reason): "unavailable (\(reason))"
+    }
+}
+
 let environment = ProcessInfo.processInfo.environment
 let arguments = Array(CommandLine.arguments.dropFirst())
 guard !arguments.isEmpty else { fail("usage: notes-debug <input-text-file> [material-file-or-url ...]") }
@@ -49,7 +58,7 @@ do {
             staged = try intake.stage(fileAt: URL(fileURLWithPath: argument))
         }
         let prepared = await intake.prepare(staged)
-        print("material \(materials.count + 1): \(staged.displayName) -> \(prepared.state)")
+        print("material \(materials.count + 1): \(staged.displayName) -> \(describe(prepared.state))")
         materials.append(OrganizeMaterial(staged: staged, prepared: prepared))
     }
 
