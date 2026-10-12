@@ -142,7 +142,8 @@ struct MaterialIntakeTests {
         let intake = try makeIntake()
         let staged = try intake.stage(fileAt: try source("a.txt", text: "x"))
         let task = Task {
-            while !Task.isCancelled { await Task.yield() }
+            // 睡眠在取消时立刻返回；不用忙等，免得占住协作线程
+            try? await Task.sleep(for: .seconds(60))
             return await intake.prepare(staged)
         }
         task.cancel()
