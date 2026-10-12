@@ -101,8 +101,11 @@ final class BoardModel {
     /// 编辑中失焦（点 Board 别处、切到别的 app、点顶栏按钮等）时保存；没在编辑时什么也不做。
     func commitEditing() { editingCommit?() }
 
-    /// NoteEditor 出现时登记保存动作，消失时传 nil。编辑器消失后拿不到内容，正在进行的编辑随之结束。
+    /// NoteEditor 出现时登记保存动作，消失时传 nil。消失时若仍在编辑，先提交一次；之后拿不到内容，编辑随之结束。
     func registerEditingCommit(_ commit: (() -> Void)?) {
+        // 编辑器在编辑中被回收（滚出可视区、分组变化重建）：注销之前先提交，免得修改悄悄丢掉。
+        // 已经保存或 Esc 过的（editingID 为 nil）不重复保存。
+        if commit == nil, state.editingID != nil { editingCommit?() }
         editingCommit = commit
         state.setEditorAvailable(commit != nil)
     }
