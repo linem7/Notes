@@ -78,32 +78,40 @@ struct WebFetchSupportTests {
     // MARK: 并发和超时
 
     private actor Peak {
-        private var current = 0
+        private(set) var current = 0
         private(set) var maximum = 0
         func enter() { current += 1; maximum = max(maximum, current) }
         func leave() { current -= 1 }
     }
 
-    @Test func limiterNeverRunsMoreThanTwoAtOnceButRunsAll() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func limiterNeverRunsMoreThanTwoAtOnceButRunsAll() async throws {
         let limiter = FetchLimiter(limit: 2)
         let peak = Peak()
-        let done = try await withThrowingTaskGroup(of: Int.self) { group in
-            for i in 0..<6 {
-                group.addTask {
-                    try await limiter.withPermit {
-                        await peak.enter()
-                        try await Task.sleep(for: .milliseconds(40))
-                        await peak.leave()
-                        return i
-                    }
+        let gate = Gate()
+        let tasks = (0..<6).map { i in
+            Task {
+                try await limiter.withPermit {
+                    await peak.enter()
+                    await gate.wait()
+                    await peak.leave()
+                    return i
                 }
             }
-            var all: [Int] = []
-            for try await i in group { all.append(i) }
-            return all
         }
+        // 两个占着位置、四个在排队时，门还关着：此刻并发数就是 2
+        try await waitUntil {
+            let waiting = await limiter.waitingCount
+            let current = await peak.current
+            return waiting == 4 && current == 2
+        }
+        #expect(await limiter.runningCount == 2)
+        await gate.open()
+        var done: [Int] = []
+        for task in tasks { done.append(try await task.value) }
         #expect(done.sorted() == Array(0..<6))
         #expect(await peak.maximum == 2)
+        #expect(await limiter.runningCount == 0)
     }
 
     @Test func permitIsReleasedWhenTheOperationThrows() async throws {
@@ -112,18 +120,6 @@ struct WebFetchSupportTests {
         await #expect(throws: Boom.self) { try await limiter.withPermit { throw Boom() } }
         let value = try await limiter.withPermit { 7 }
         #expect(value == 7)
-    }
-
-    @Test func aCancelledWaiterLeavesTheQueueWithoutTakingAPermit() async throws {
-        let limiter = FetchLimiter(limit: 1)
-        let holder = Task { try await limiter.withPermit { try await Task.sleep(for: .milliseconds(300)) } }
-        try await Task.sleep(for: .milliseconds(50))
-        let waiter = Task { try await limiter.withPermit { 1 } }
-        try await Task.sleep(for: .milliseconds(50))
-        waiter.cancel()
-        await #expect(throws: CancellationError.self) { try await waiter.value }
-        try await holder.value
-        #expect(try await limiter.withPermit { 2 } == 2)
     }
 
     private actor Flag {
@@ -140,28 +136,136 @@ struct WebFetchSupportTests {
         Issue.record("等待超时")
     }
 
+    /// 手动开关：`wait()` 一直等到 `open()`，不依赖睡眠。
+    private actor Gate {
+        private var isOpen = false
+        private var continuations: [CheckedContinuation<Void, Never>] = []
+
+        func wait() async {
+            if isOpen { return }
+            await withCheckedContinuation { continuations.append($0) }
+        }
+
+        func open() {
+            isOpen = true
+            for continuation in continuations { continuation.resume() }
+            continuations = []
+        }
+    }
+
+    /// 占住唯一的位置，直到 `release` 开门。返回的 Task 在占住位置之后才返回。
+    private func hold(_ limiter: FetchLimiter, until release: Gate) async throws -> Task<Void, any Error> {
+        let started = Flag()
+        let holder = Task {
+            try await limiter.withPermit {
+                await started.set()
+                await release.wait()
+            }
+        }
+        try await waitUntil { await started.isSet }
+        return holder
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func aCancelledQueuedFetchNeverRunsAndTheNextWaiterStillGetsTheSlot() async throws {
         let limiter = FetchLimiter(limit: 1)
+        let gate = Gate()
         let ran = Flag()
-        let holderStarted = Flag()
-        let holder = Task {
-            try await limiter.withPermit {
-                await holderStarted.set()
-                try await Task.sleep(for: .milliseconds(300))
-            }
-        }
-        try await waitUntil { await holderStarted.isSet }
+        let holder = try await hold(limiter, until: gate)
         let cancelled = Task { try await limiter.withPermit { await ran.set() } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await limiter.waitingCount == 1 }
         let next = Task { try await limiter.withPermit { "next" } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await limiter.waitingCount == 2 }
 
+        // 取消和放位置几乎同时发生：不管谁先到，被取消的都不能执行，位置要传给下一个
         cancelled.cancel()
+        await gate.open()
         await #expect(throws: CancellationError.self) { try await cancelled.value }
         try await holder.value
         #expect(try await next.value == "next")
         #expect(await ran.isSet == false)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cancelFirstThenRelease_theQueuedFetchLeavesAndNeverRuns() async throws {
+        let limiter = FetchLimiter(limit: 1)
+        let gate = Gate()
+        let ran = Flag()
+        let holder = try await hold(limiter, until: gate)
+        let cancelled = Task { try await limiter.withPermit { await ran.set() } }
+        try await waitUntil { await limiter.waitingCount == 1 }
+        let next = Task { try await limiter.withPermit { "next" } }
+        try await waitUntil { await limiter.waitingCount == 2 }
+
+        // 先取消，等它真的离开队列，再放位置
+        cancelled.cancel()
+        await #expect(throws: CancellationError.self) { try await cancelled.value }
+        try await waitUntil { await limiter.waitingCount == 1 }
+        await gate.open()
+        try await holder.value
+        #expect(try await next.value == "next")
+        #expect(await ran.isSet == false)
+        #expect(try await limiter.withPermit { 2 } == 2)
+    }
+
+    /// 钩子的控制：`arm()` 之后第一次有人拿到位置时停在钩子里，直到 `gate` 开门。
+    private actor HookControl {
+        private var armed = false
+        private(set) var reached = false
+        let gate = Gate()
+
+        func arm() { armed = true }
+        func pass() async {
+            guard armed else { return }
+            armed = false
+            reached = true
+            await gate.wait()
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func releaseFirstThenCancel_theCancelledFetchHandsThePermitOnWithoutRunning() async throws {
+        let control = HookControl()
+        let limiter = FetchLimiter(limit: 1, afterAcquire: { await control.pass() })
+        let holderGate = Gate()
+        let ran = Flag()
+        let holder = try await hold(limiter, until: holderGate)
+        await control.arm()
+        let cancelled = Task { try await limiter.withPermit { await ran.set() } }
+        try await waitUntil { await limiter.waitingCount == 1 }
+        let next = Task { try await limiter.withPermit { "next" } }
+        try await waitUntil { await limiter.waitingCount == 2 }
+
+        // 先放位置：位置交到被取消的任务手上，它停在钩子里；这时才取消它
+        await holderGate.open()
+        try await holder.value
+        try await waitUntil { await control.reached }
+        cancelled.cancel()
+        await control.gate.open()
+
+        await #expect(throws: CancellationError.self) { try await cancelled.value }
+        #expect(try await next.value == "next")
+        #expect(await ran.isSet == false)
+        #expect(await limiter.waitingCount == 0)
+        #expect(try await limiter.withPermit { 3 } == 3)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aTaskCancelledBeforeReachingTheLimiterNeverRunsAndTakesNoPermit() async throws {
+        let limiter = FetchLimiter(limit: 1)
+        let ran = Flag()
+        let start = Gate()
+        let task = Task {
+            await start.wait()   // 不响应取消：任务到达限流器时已经是被取消的状态
+            return try await limiter.withPermit { await ran.set(); return 1 }
+        }
+        task.cancel()
+        await start.open()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(await ran.isSet == false)
+        #expect(await limiter.waitingCount == 0)
+        // 空位没有被占
+        #expect(try await limiter.withPermit { 2 } == 2)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -176,7 +280,7 @@ struct WebFetchSupportTests {
         }
         try await waitUntil { await started.isSet }
         let next = Task { try await limiter.withPermit { "next" } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await limiter.waitingCount == 1 }
 
         running.cancel()
         await #expect(throws: CancellationError.self) { try await running.value }
@@ -237,24 +341,31 @@ struct WebFetchSupportTests {
     @Test(.timeLimit(.minutes(1)))
     func cancellingAHungFetchFreesItsSlot() async throws {
         let runner = FetchRunner(limit: 1, timeout: .seconds(60))
-        let hung = Task { try await runner.run { await Self.neverReturns() } }
-        try await Task.sleep(for: .milliseconds(50))
+        let started = Flag()
+        let hung = Task { try await runner.run { await started.set(); return await Self.neverReturns() } }
+        try await waitUntil { await started.isSet }
         let next = Task { try await runner.run { "next" } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await runner.limiter.waitingCount == 1 }
         hung.cancel()
         await #expect(throws: CancellationError.self) { try await hung.value }
         #expect(try await next.value == "next")
+        #expect(await runner.limiter.runningCount == 0)
     }
 
     @Test(.timeLimit(.minutes(1)))
     func timeQueuedBehindAnotherFetchDoesNotCountTowardsTheTimeout() async throws {
-        // 1 个位置，时限 400 ms，两个任务各要 250 ms：第二个排队 250 ms 再跑 250 ms，总共超过时限，
-        // 但它自己的 250 ms 没超，所以不能超时
-        let runner = FetchRunner(limit: 1, timeout: .milliseconds(400))
-        async let first: Int = runner.run { try await Task.sleep(for: .milliseconds(250)); return 1 }
-        try await Task.sleep(for: .milliseconds(50))
-        async let second: Int = runner.run { try await Task.sleep(for: .milliseconds(250)); return 2 }
-        #expect(try await first == 1)
-        #expect(try await second == 2)
+        // 1 个位置，时限 300 ms。第一个抓取占着位置（门关着），第二个排队超过 700 ms，也就是远超时限，
+        // 然后第一个放行、第二个立刻跑完：排队的时间不算，所以第二个不能超时
+        let runner = FetchRunner(limit: 1, timeout: .milliseconds(300))
+        let gate = Gate()
+        let started = Flag()
+        let first = Task { try await runner.run { await started.set(); await gate.wait(); return 1 } }
+        try await waitUntil { await started.isSet }
+        let second = Task { try await runner.run { 2 } }
+        try await waitUntil { await runner.limiter.waitingCount == 1 }
+        try await Task.sleep(for: .milliseconds(700))
+        await gate.open()
+        #expect(try await first.value == 1)
+        #expect(try await second.value == 2)
     }
 }

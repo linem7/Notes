@@ -85,20 +85,39 @@ public enum WebPageExtraction {
 /// 限制同时进行的抓取个数；等位置的任务被取消时马上退出。
 public actor FetchLimiter {
     private let limit: Int
+    /// 测试钩子：位置到手之后、检查取消之前调用，用来把「位置先到、取消后到」这个顺序卡住。
+    private let afterAcquire: (@Sendable () async -> Void)?
     private var running = 0
     private var waiters: [(id: UUID, continuation: CheckedContinuation<Void, Error>)] = []
 
     public init(limit: Int = WebFetchPolicy.maxConcurrent) {
         self.limit = limit
+        self.afterAcquire = nil
     }
+
+    init(limit: Int, afterAcquire: @escaping @Sendable () async -> Void) {
+        self.limit = limit
+        self.afterAcquire = afterAcquire
+    }
+
+    /// 正在排队的任务数（测试用：等它排上队再取消，不靠睡眠碰运气）。
+    var waitingCount: Int { waiters.count }
+    /// 正在占着位置的任务数（测试用）。
+    var runningCount: Int { running }
 
     public func withPermit<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
         try await acquire()
         defer { release() }
+        await afterAcquire?()
+        // 排队时被取消，但位置在取消生效之前就交到了手上（`onCancel` 要先跳回 actor 才能把它移出队列）：
+        // 不执行，`defer` 把位置交给下一个
+        try Task.checkCancellation()
         return try await operation()
     }
 
     private func acquire() async throws {
+        // 到达限流器之前就已经被取消的，空位也不能拿
+        try Task.checkCancellation()
         if running < limit {
             running += 1
             return
@@ -148,7 +167,7 @@ public func withFetchTimeout<T: Sendable>(
 /// 一次抓取的完整流程：先在限流器外排队，拿到位置之后才开始算 20 秒（排队的时间不算），
 /// 超时或被取消时立刻放掉位置。`load` 由 App 注入（WKWebView），测试里换成假的。
 public struct FetchRunner: Sendable {
-    private let limiter: FetchLimiter
+    let limiter: FetchLimiter
     private let timeout: Duration
 
     public init(limit: Int = WebFetchPolicy.maxConcurrent, timeout: Duration = WebFetchPolicy.timeout) {
