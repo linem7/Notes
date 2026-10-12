@@ -8,6 +8,9 @@ public enum NoteStoreError: Error, Equatable, Sendable {
 /// Note 和 Material 的存储（ARCHITECTURE §3.2）。真实实现是 GRDB 的 `NoteStore`，
 /// `InMemoryNoteStore` 用于预览和测试。
 public protocol NoteStoring: Sendable {
+    /// 所有 Material 行引用的文件名（storedFile / textFile / snapshotFile 的并集），给 `collectGarbage` 用。
+    func referencedFileNames() async throws -> Set<String>
+
     /// 全部 Note，按 createdAt、id 升序；Material 按 `sortedForDisplay` 排好。
     func allNotes() async throws -> [NoteWithMaterials]
 
@@ -26,23 +29,23 @@ public protocol NoteStoring: Sendable {
     /// `at` 为 nil 表示取消完成。不改 `updatedAt`。Note 不存在时抛 `noteNotFound`。
     func setDone(id: UUID, at: Date?) async throws
 
-    /// 删记录，再删 `materials/<noteID>/`。不存在时什么也不做。
+    /// 只删记录（Material 级联），然后回收没人再引用的文件（§3.3）。不存在时什么也不做。
     func delete(id: UUID) async throws
 
-    /// 把文件复制进 `materials/<noteID>/` 并插入 File 记录，一次完成。
+    /// 把文件复制进 `materials/files/` 并插入 File 记录。插入失败时文件留给下一次回收。
     func addMaterial(noteID: UUID, from sourceURL: URL, displayName: String?) async throws -> Material
 
-    /// 插入一条文件已经在 `materials/<noteID>/` 里的记录（Source、Web Page）。
+    /// 插入一条文件已经在 `materials/files/` 里的记录（Source、Web Page）。
     func addMaterial(_ material: Material) async throws
 
-    /// 删记录和它的文件。不存在时什么也不做。
+    /// 删记录，然后回收没人再引用的文件。不存在时什么也不做。
     func deleteMaterial(id: UUID) async throws
 
-    /// 删除 `doneAt < now - 30 天` 的 Note（刚好 30 天的保留），返回个数。
+    /// 删除 `doneAt < now - 30 天` 的 Note（刚好 30 天的保留），再回收文件，返回个数。
     @discardableResult
     func deleteExpiredDone(now: Date) async throws -> Int
 
-    /// 清空 Done 区，返回个数。
+    /// 清空 Done 区，再回收文件，返回个数。
     @discardableResult
     func deleteAllDone() async throws -> Int
 }

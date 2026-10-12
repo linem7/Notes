@@ -24,8 +24,17 @@ struct StoreFixture {
         }
     }
 
-    func exists(_ noteID: UUID) -> Bool {
-        FileManager.default.fileExists(atPath: files.directory(for: noteID).path)
+    /// `materials/files/` 里现有的条目名。
+    func fileNames() -> Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: files.filesDirectory.path)) ?? [])
+    }
+
+    /// 把 `files/` 里现有条目的修改时间拨到宽限期之外（回收会跳过刚写的文件）。
+    func ageAllFiles() throws {
+        let old = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        for name in fileNames() {
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: files.filesDirectory.appendingPathComponent(name).path)
+        }
     }
 
     func sourceFile(_ name: String = "a.txt", _ text: String = "hi") throws -> URL {
@@ -186,14 +195,15 @@ struct NoteStoringContractTests {
     // MARK: 删除
 
     @Test(arguments: StoreKind.allCases)
-    func deletingANoteRemovesItsMaterialsAndDirectory(kind: StoreKind) async throws {
+    func deletingTheLastReferencingNoteRemovesItsFile(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
         let n = note("n")
         try await f.store.insert(notes: [n], materials: [])
         _ = try await f.store.addMaterial(noteID: n.id, from: try f.sourceFile())
-        #expect(f.exists(n.id))
+        #expect(f.fileNames().count == 1)
+        try f.ageAllFiles()
         try await f.store.delete(id: n.id)
-        #expect(!f.exists(n.id))
+        #expect(f.fileNames().isEmpty)
         #expect(try await f.store.allNotes().isEmpty)
     }
 
@@ -211,6 +221,7 @@ struct NoteStoringContractTests {
         try await f.store.insert(notes: [n], materials: [])
         let file = try await f.store.addMaterial(noteID: n.id, from: try f.sourceFile())
         #expect(f.files.url(for: file, role: .stored) != nil)
+        try f.ageAllFiles()
         try await f.store.deleteMaterial(id: file.id)
         #expect(f.files.url(for: file, role: .stored) == nil)
         #expect(try await f.store.allNotes().first?.materials.isEmpty == true)
@@ -225,9 +236,10 @@ struct NoteStoringContractTests {
         let boundary = note("boundary", done: cutoff)
         try await f.store.insert(notes: [expired, boundary, note("open")], materials: [])
         _ = try await f.store.addMaterial(noteID: expired.id, from: try f.sourceFile())
+        try f.ageAllFiles()
         #expect(try await f.store.deleteExpiredDone(now: now) == 1)
         #expect(try await f.store.allNotes().map(\.note.title).sorted() == ["boundary", "open"])
-        #expect(!f.exists(expired.id))
+        #expect(f.fileNames().isEmpty)
     }
 
     @Test(arguments: StoreKind.allCases)
@@ -237,11 +249,11 @@ struct NoteStoringContractTests {
         let open = note("b")
         try await f.store.insert(notes: [done, open], materials: [])
         _ = try await f.store.addMaterial(noteID: done.id, from: try f.sourceFile("d.txt"))
-        _ = try await f.store.addMaterial(noteID: open.id, from: try f.sourceFile("o.txt"))
+        let kept = try await f.store.addMaterial(noteID: open.id, from: try f.sourceFile("o.txt"))
+        try f.ageAllFiles()
         #expect(try await f.store.deleteAllDone() == 1)
         #expect(try await f.store.allNotes().map(\.note.title) == ["b"])
-        #expect(!f.exists(done.id))
-        #expect(f.exists(open.id))
+        #expect(f.fileNames() == [try #require(kept.storedFile)])
     }
 
     // MARK: Material
@@ -265,7 +277,7 @@ struct NoteStoringContractTests {
         await #expect(throws: NoteStoreError.noteNotFound(ghost)) {
             try await f.store.addMaterial(noteID: ghost, from: try f.sourceFile())
         }
-        #expect(!f.exists(ghost))
+        #expect(f.fileNames().isEmpty)
     }
 
     @Test(arguments: StoreKind.allCases)
@@ -279,6 +291,90 @@ struct NoteStoringContractTests {
         let orphan = Material(noteID: UUID(), kind: .source, displayName: "Source")
         await #expect(throws: NoteStoreError.noteNotFound(orphan.noteID)) { try await f.store.addMaterial(orphan) }
         #expect(try await f.store.allNotes().first?.materials == [m])
+    }
+
+    // MARK: 共享文件（ARCHITECTURE §3.3）
+
+    /// 两条 Note 各有一行 Material，引用 `files/` 里的同一个文件。
+    private func twoNotesSharingOneFile(_ f: StoreFixture) async throws -> (a: Note, b: Note, name: String) {
+        let a = note("a"), b = note("b")
+        let name = try f.files.importFile(from: try f.sourceFile("shared.pdf", "shared"))
+        let rowA = Material(noteID: a.id, kind: .file, displayName: "shared.pdf", storedFile: name)
+        let rowB = Material(noteID: b.id, kind: .file, displayName: "shared.pdf", storedFile: name)
+        try await f.store.insert(notes: [a, b], materials: [rowA, rowB])
+        return (a, b, name)
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func referencedFileNamesIsTheUnionOfAllThreeFileColumns(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let n = note("n")
+        try await f.store.insert(notes: [n], materials: [
+            Material(noteID: n.id, kind: .file, displayName: "f", storedFile: "a.pdf"),
+            Material(noteID: n.id, kind: .webPage, displayName: "w", url: "https://x.com", textFile: "b.txt", snapshotFile: "c.pdf"),
+            Material(noteID: n.id, kind: .source, displayName: "Source", storedFile: "a.pdf"),
+        ])
+        #expect(try await f.store.referencedFileNames() == ["a.pdf", "b.txt", "c.pdf"])
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func deletingOneNoteKeepsAFileAnotherNoteStillUses(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let (a, b, name) = try await twoNotesSharingOneFile(f)
+        try f.ageAllFiles()
+        try await f.store.delete(id: a.id)
+        #expect(f.fileNames() == [name])
+        let remaining = try await f.store.allNotes()
+        #expect(remaining.map(\.note.id) == [b.id])
+        let material = try #require(remaining.first?.materials.first)
+        #expect(try f.files.readText(of: material, role: .stored) == "shared")
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func theFileGoesWhenTheLastReferenceGoes(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let (a, b, _) = try await twoNotesSharingOneFile(f)
+        try f.ageAllFiles()
+        try await f.store.delete(id: a.id)
+        #expect(f.fileNames().count == 1)
+        try await f.store.delete(id: b.id)
+        #expect(f.fileNames().isEmpty)
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func deletingOneMaterialRowKeepsAFileAnotherRowUses(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let (a, _, name) = try await twoNotesSharingOneFile(f)
+        try f.ageAllFiles()
+        let row = try #require(try await f.store.allNotes().first { $0.id == a.id }?.materials.first)
+        try await f.store.deleteMaterial(id: row.id)
+        #expect(f.fileNames() == [name])
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func expiredCleanupKeepsFilesSharedWithALiveNote(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let now = Date(timeIntervalSinceReferenceDate: 10_000_000)
+        let expired = note("expired", done: now.addingTimeInterval(-Note.doneRetention - 1))
+        let live = note("live")
+        let name = try f.files.importFile(from: try f.sourceFile())
+        try await f.store.insert(notes: [expired, live], materials: [
+            Material(noteID: expired.id, kind: .file, displayName: "f", storedFile: name),
+            Material(noteID: live.id, kind: .file, displayName: "f", storedFile: name),
+        ])
+        try f.ageAllFiles()
+        #expect(try await f.store.deleteExpiredDone(now: now) == 1)
+        #expect(f.fileNames() == [name])
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func aFileWrittenForASaveInFlightSurvivesAnotherDeletesCollection(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let other = note("other")
+        try await f.store.insert(notes: [other], materials: [])
+        let inFlight = try f.files.writeSourceText("not yet committed")   // 文件写好了，记录还没插
+        try await f.store.delete(id: other.id)                             // 别处触发的回收
+        #expect(f.fileNames() == [inFlight])
     }
 
     // MARK: observe

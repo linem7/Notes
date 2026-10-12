@@ -3,7 +3,7 @@ import GRDB
 
 /// 本地存储（ARCHITECTURE §3.2）：GRDB 数据库加 `materials/` 目录。
 ///
-/// 目录结构：`<directory>/notes.sqlite`、`<directory>/materials/<noteID>/`、`<directory>/staging/`。
+/// 目录结构：`<directory>/notes.sqlite`、`<directory>/materials/files/`、`<directory>/staging/`。
 /// App 里 directory 是 `~/Library/Application Support/com.linem7.Notes/`。
 public final class NoteStore: NoteStoring, Sendable {
     /// 测试里直接查表用（比如确认外键开着、级联删除生效）。
@@ -99,21 +99,20 @@ public final class NoteStore: NoteStoring, Sendable {
         try await database.write { db in
             try db.execute(sql: "DELETE FROM note WHERE id = ?", arguments: [id.uuidString])
         }
-        // 先提交数据库再删目录：中途崩溃只会留下孤儿目录，启动时的清理会删掉
-        files.removeNoteDirectory(id)
+        try await collectGarbage()
     }
 
     public func addMaterial(noteID: UUID, from sourceURL: URL, displayName: String?) async throws -> Material {
         guard try await database.read({ db in try Self.noteExists(noteID, db) }) else {
             throw NoteStoreError.noteNotFound(noteID)
         }
-        let material = try files.importFile(sourceURL, noteID: noteID, displayName: displayName, now: clock())
-        do {
-            try await addMaterial(material)
-        } catch {
-            files.removeFiles(of: material)
-            throw error
-        }
+        let material = Material(
+            noteID: noteID, kind: .file,
+            displayName: displayName ?? sourceURL.lastPathComponent,
+            storedFile: try files.importFile(from: sourceURL), createdAt: clock()
+        )
+        // 插入失败时文件留着，下一次 collectGarbage 回收
+        try await addMaterial(material)
         return material
     }
 
@@ -122,15 +121,27 @@ public final class NoteStore: NoteStoring, Sendable {
     }
 
     public func deleteMaterial(id: UUID) async throws {
-        let material = try await database.write { db -> Material? in
-            guard let row = try Row.fetchOne(db, sql: "SELECT * FROM material WHERE id = ?", arguments: [id.uuidString]) else {
-                return nil
-            }
-            let material = try Self.material(from: row)
+        try await database.write { db in
             try db.execute(sql: "DELETE FROM material WHERE id = ?", arguments: [id.uuidString])
-            return material
         }
-        if let material { files.removeFiles(of: material) }
+        try await collectGarbage()
+    }
+
+    public func referencedFileNames() async throws -> Set<String> {
+        try await database.read { db in
+            var names: Set<String> = []
+            for row in try Row.fetchAll(db, sql: "SELECT storedFile, textFile, snapshotFile FROM material") {
+                for column in ["storedFile", "textFile", "snapshotFile"] {
+                    if let name: String = row[column] { names.insert(name) }
+                }
+            }
+            return names
+        }
+    }
+
+    /// 回收没人引用的文件。用真实时间判断宽限期（文件的修改时间是真实时间，和注入的 clock 无关）。
+    private func collectGarbage() async throws {
+        files.collectGarbage(referenced: try await referencedFileNames(), now: Date())
     }
 
     @discardableResult
@@ -145,13 +156,12 @@ public final class NoteStore: NoteStoring, Sendable {
     }
 
     private func deleteNotes(where condition: String, arguments: StatementArguments) async throws -> Int {
-        let ids = try await database.write { db -> [UUID] in
-            let ids = try String.fetchAll(db, sql: "SELECT id FROM note WHERE \(condition)", arguments: arguments)
+        let count = try await database.write { db -> Int in
             try db.execute(sql: "DELETE FROM note WHERE \(condition)", arguments: arguments)
-            return ids.compactMap(UUID.init(uuidString:))
+            return db.changesCount
         }
-        for id in ids { files.removeNoteDirectory(id) }
-        return ids.count
+        try await collectGarbage()
+        return count
     }
 }
 
