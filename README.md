@@ -4,6 +4,26 @@ A macOS desktop task-note app. Pin the board to your desktop, or press **Option 
 
 - 一个固定在桌面的任务便签。按 **Option + N** 唤起，粘贴聊天记录、拖入文件、贴链接或直接输入，模型整理成「标题 + 截止日期 + 要点」的 Note；原始文件、网页快照和原文保存在本地，执行任务时一键打开。
 
+## 下载与安装
+
+**v0.1.0（开发中，尚未发布）：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
+
+[下载安装包](https://github.com/linem7/Notes/releases)（TODO：v0.1.0 发布后换成直链） · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Notes/releases)
+
+解压后把 `Notes.app` 拖进 **Applications**。首次打开如被拦截，进入 **System Settings › Privacy & Security › Open Anyway**。应用采用自签名、未经过 Apple 公证；使用时需要自己的 API key。无需安装 Xcode 或创建证书。
+
+## 功能
+
+完整规格见 [docs/SPEC.md](docs/SPEC.md)。
+
+- **Board**：固定在桌面上的单列看板，按 Overdue / Today / Upcoming / No Date / Done 分组；On Desktop（像 Stickies 钉在桌面）或 On Top（始终在最前）。
+- **Quick Add**：按 **Option + N**（可改）从任何 app 唤起，粘贴聊天记录、拖入文件、贴链接或直接输入。
+- **Organize**：模型（默认 DeepSeek，不开思考）整理成 **标题 + 截止日期 + 要点**，一次输入可拆成多条，保存前可逐条修改；⌘⏎ 可跳过模型原样保存。
+- **Material**：原文、文件、网页（正文 + PDF 快照）保存在本地，执行任务时一键打开；PDF、图片（本地 OCR）、文本和网页可被模型读取。
+- 常驻菜单栏，图标旁显示今天到期和已逾期的数量；不发通知、不做提醒、不同步，数据都在本机。
+
+**不做**：系统通知和日历、模型思考和联网搜索、读取 Word / Excel / PPT、搜索和标签、iCloud 同步、自动更新（详见 SPEC §10）。
+
 **Status:** v1 in development (project skeleton: menu bar icon + Quit only). See [docs/SPEC.md](docs/SPEC.md) (spec), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (implementation), [CONTEXT.md](CONTEXT.md) (glossary), [docs/adr/](docs/adr/) (decisions).
 
 Requirements: macOS 26+, Apple Silicon, your own API key (DeepSeek or any OpenAI-compatible service).
