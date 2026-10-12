@@ -64,4 +64,37 @@ struct NotesMaintenanceTests {
         #expect(FileManager.default.fileExists(atPath: live.directory.path))
         #expect(!FileManager.default.fileExists(atPath: stale.directory.path))
     }
+
+    /// 24 小时清理读到「正在用的会话」之后，用户又粘贴了文件，Quick Add 新建了一个不在 keeping 里的会话。
+    @Test(arguments: StoreKind.allCases)
+    func theDailyRunSparesAFreshSessionThatIsNotInKeepingButRemovesOldOnes(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let fresh = try f.files.makeStagingSession()
+        _ = try f.files.stage(data: Data("just pasted".utf8), name: "a.txt", in: fresh)
+        let old = try f.files.makeStagingSession()
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: old.directory.path)
+
+        let report = await NotesMaintenance(store: f.store, files: f.files)
+            .run(keepingStaging: [], respectingStagingGracePeriod: true)
+
+        #expect(report.stagingDirectoriesDeleted == 1)
+        #expect(FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(!FileManager.default.fileExists(atPath: old.directory.path))
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func theLaunchRunRemovesFreshAndOldSessionsAlike(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let fresh = try f.files.makeStagingSession()
+        let old = try f.files.makeStagingSession()
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: old.directory.path)
+
+        let report = await NotesMaintenance(store: f.store, files: f.files).run()
+
+        #expect(report.stagingDirectoriesDeleted == 2)
+        #expect(!FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(!FileManager.default.fileExists(atPath: old.directory.path))
+    }
 }

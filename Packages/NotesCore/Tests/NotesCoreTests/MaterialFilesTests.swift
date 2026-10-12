@@ -215,4 +215,46 @@ struct MaterialFilesTests {
         #expect(!FileManager.default.fileExists(atPath: stray.path))
         #expect(FileManager.default.fileExists(atPath: keep.directory.path))
     }
+
+    @Test func clearStagingWithGraceSkipsFreshEntriesAndRemovesOldOnes() throws {
+        let files = try makeFiles()
+        let fresh = try files.makeStagingSession()
+        let old = try files.makeStagingSession()
+        let freshStray = files.stagingDirectory.appendingPathComponent("fresh.txt")
+        let oldStray = files.stagingDirectory.appendingPathComponent("old.txt")
+        try Data("x".utf8).write(to: freshStray)
+        try Data("x".utf8).write(to: oldStray)
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        for url in [old.directory, oldStray] {
+            try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: url.path)
+        }
+
+        let result = files.clearStaging(respectingGracePeriod: true)
+        #expect(result.removed == 2)
+        #expect(result.failed == 0)
+        #expect(FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(FileManager.default.fileExists(atPath: freshStray.path))
+        #expect(!FileManager.default.fileExists(atPath: old.directory.path))
+        #expect(!FileManager.default.fileExists(atPath: oldStray.path))
+    }
+
+    @Test func clearStagingWithoutGraceRemovesEverythingNotKept() throws {
+        let files = try makeFiles()
+        let fresh = try files.makeStagingSession()
+        let kept = try files.makeStagingSession()
+        let result = files.clearStaging(keeping: [kept.id])
+        #expect(result.removed == 1)
+        #expect(!FileManager.default.fileExists(atPath: fresh.directory.path))
+        #expect(FileManager.default.fileExists(atPath: kept.directory.path))
+    }
+
+    @Test func addingAFileToAnOldSessionMakesItFreshAgain() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        let longAgo = Date().addingTimeInterval(-(MaterialFiles.garbageGracePeriod + 60))
+        try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: session.directory.path)
+        _ = try files.stage(data: Data("pasted".utf8), name: "a.txt", in: session)
+        #expect(files.clearStaging(respectingGracePeriod: true).removed == 0)
+        #expect(FileManager.default.fileExists(atPath: session.directory.path))
+    }
 }
