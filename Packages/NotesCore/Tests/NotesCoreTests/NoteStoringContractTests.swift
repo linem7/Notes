@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import Testing
 @testable import NotesCore
 
@@ -303,19 +304,57 @@ struct NoteStoringContractTests {
     @Test(arguments: StoreKind.allCases)
     func observeFinishesWhenTheSubscriberIsCancelled(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
+        let received = Counter()
         let stream = f.store.observe()
-        let consumer = Task { () -> Int in
-            var count = 0
-            for await _ in stream { count += 1 }
-            return count
+        let consumer = Task {
+            for await _ in stream { await received.increment() }
         }
         try await f.store.insert(notes: [note("n")], materials: [])
+        // 初始值 + 一次插入
+        try await received.waitUntilAtLeast(2)
         consumer.cancel()
-        let count = await consumer.value   // 取消后 for-await 结束，不会永远挂着
-        #expect(count >= 0)
-        // 取消之后继续写入不应出问题
+        await consumer.value    // 取消后 for-await 结束；不结束这里会一直挂着
+        let before = await received.value
+        #expect(before >= 2)
+
+        // 取消之后继续写入：订阅已经结束，不应再收到值
         try await f.store.insert(notes: [note("m")], materials: [])
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await received.value == before)
         #expect(try await f.store.allNotes().count == 2)
+    }
+}
+
+private actor Counter {
+    private(set) var value = 0
+    func increment() { value += 1 }
+    func waitUntilAtLeast(_ n: Int, timeout: Duration = .seconds(10)) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while value < n {
+            guard ContinuousClock.now < deadline else { throw CounterTimeout() }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+}
+
+private struct CounterTimeout: Error {}
+
+struct NoteStoreGRDBTests {
+    @Test func deletingANoteCascadesToItsMaterialRowsAndForeignKeysAreOn() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("NoteStoreCascade-\(UUID().uuidString)")
+        let store = try NoteStore(directory: root)
+        let n = note("n")
+        try await store.insert(notes: [n], materials: [
+            Material(noteID: n.id, kind: .source, displayName: "Source"),
+            Material(noteID: n.id, kind: .file, displayName: "f"),
+        ])
+        let before = try await store.database.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM material") }
+        #expect(before == 2)
+        try await store.delete(id: n.id)
+        let after = try await store.database.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM material") }
+        #expect(after == 0)
+        let foreignKeys = try await store.database.read { db in try Int.fetchOne(db, sql: "PRAGMA foreign_keys") }
+        #expect(foreignKeys == 1)
     }
 }
 

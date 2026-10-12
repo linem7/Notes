@@ -6,6 +6,7 @@ public enum MaterialFileRole: Sendable {
 
 public enum MaterialFilesError: Error, Equatable, Sendable {
     case missing(fileName: String)
+    case invalidFileName(String)
 }
 
 /// Quick Add 期间一次会话的临时目录 `staging/<sessionID>/`（ARCHITECTURE §3.3）。
@@ -61,6 +62,7 @@ public struct MaterialFiles: Sendable {
     // MARK: 写入 materials/<noteID>/
 
     public func write(_ data: Data, fileName: String, noteID: UUID) throws {
+        guard Self.isPlainFileName(fileName) else { throw MaterialFilesError.invalidFileName(fileName) }
         let folder = directory(for: noteID)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try data.write(to: folder.appendingPathComponent(fileName), options: .atomic)
@@ -68,6 +70,7 @@ public struct MaterialFiles: Sendable {
 
     /// 复制文件或目录（`.pages` 这类 bundle 是目录）。
     public func copy(_ source: URL, fileName: String, noteID: UUID) throws {
+        guard Self.isPlainFileName(fileName) else { throw MaterialFilesError.invalidFileName(fileName) }
         let folder = directory(for: noteID)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: source, to: folder.appendingPathComponent(fileName))
@@ -128,15 +131,20 @@ public struct MaterialFiles: Sendable {
         try? FileManager.default.removeItem(at: session.directory)
     }
 
-    /// 删掉 `staging/` 下除 `keeping` 以外的全部会话目录，返回删掉的个数。
-    @discardableResult
-    func clearStaging(keeping: Set<UUID> = []) -> Int {
-        var removed = 0
-        for url in subdirectories(of: stagingDirectory) {
+    /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件）。
+    func clearStaging(keeping: Set<UUID> = []) -> (removed: Int, failed: Int) {
+        var removed = 0, failed = 0
+        let urls = (try? FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)) ?? []
+        for url in urls {
             if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
-            if (try? FileManager.default.removeItem(at: url)) != nil { removed += 1 }
+            do {
+                try FileManager.default.removeItem(at: url)
+                removed += 1
+            } catch {
+                failed += 1
+            }
         }
-        return removed
+        return (removed, failed)
     }
 
     /// `materials/` 下目录名是 UUID 的子目录：目录名 → 最后修改时间。其他名字不碰。

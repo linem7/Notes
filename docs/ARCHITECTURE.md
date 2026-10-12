@@ -207,7 +207,7 @@ Readable Text……
 - **API key**：Keychain service `com.linem7.Notes.apikey`，account 为 Connection ID（移植 `APIKeyStore`）。
 - **开机启动**：`SMAppService.mainApp`（移植）。
 - **普通窗口**（设置）：移植 `RegularWindows`，打开时 `.regular`，关掉后 `.accessory`。
-- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和孤儿目录。
+- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和孤儿目录（没有对应记录的 `materials/<uuid>/`）。孤儿目录有 10 分钟宽限期（按目录修改时间）：保存 Note 时先写文件再插记录，启动时的清理不能把刚崩溃前写下的目录当孤儿误删。
 
 ## 10. 需要真机核实的事
 

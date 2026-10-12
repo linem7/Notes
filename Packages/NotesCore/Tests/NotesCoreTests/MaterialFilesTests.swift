@@ -109,12 +109,28 @@ struct MaterialFilesTests {
         let files = try makeFiles()
         let keep = try files.makeStagingSession()
         _ = try files.makeStagingSession()
-        #expect(files.clearStaging(keeping: [keep.id]) == 1)
+        let stray = files.stagingDirectory.appendingPathComponent("stray.txt")
+        try Data("x".utf8).write(to: stray)
+        let result = files.clearStaging(keeping: [keep.id])
+        #expect(result.removed == 2)    // 另一个会话目录 + 根目录里的零散文件
+        #expect(result.failed == 0)
+        #expect(!FileManager.default.fileExists(atPath: stray.path))
         #expect(FileManager.default.fileExists(atPath: keep.directory.path))
 
         let noteID = UUID()
         try files.write(Data("a".utf8), fileName: "a.txt", noteID: noteID)
         try FileManager.default.createDirectory(at: files.materialsDirectory.appendingPathComponent("junk"), withIntermediateDirectories: true)
         #expect(Set(files.noteDirectories().keys) == [noteID])
+    }
+
+    @Test func writeAndCopyRejectFileNamesWithPaths() throws {
+        let files = try makeFiles()
+        let noteID = UUID()
+        let source = try sourceFile(files, "a.txt")
+        for name in ["../escape.txt", "sub/x.txt", "..", ""] {
+            #expect(throws: MaterialFilesError.invalidFileName(name)) { try files.write(Data("x".utf8), fileName: name, noteID: noteID) }
+            #expect(throws: MaterialFilesError.invalidFileName(name)) { try files.copy(source, fileName: name, noteID: noteID) }
+        }
+        #expect(!FileManager.default.fileExists(atPath: files.directory(for: noteID).path))
     }
 }

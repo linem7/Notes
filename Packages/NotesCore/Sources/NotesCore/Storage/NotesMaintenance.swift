@@ -35,16 +35,24 @@ public struct NotesMaintenance: Sendable {
 
         do {
             let known = Set(try await store.allNotes().map(\.id))
+            var failed = false
             for (id, modified) in files.noteDirectories() where !known.contains(id) {
                 guard now.timeIntervalSince(modified) > Self.orphanGracePeriod else { continue }
-                files.removeNoteDirectory(id)
-                report.orphanDirectoriesDeleted += 1
+                do {
+                    try FileManager.default.removeItem(at: files.directory(for: id))
+                    report.orphanDirectoriesDeleted += 1
+                } catch {
+                    failed = true
+                }
             }
+            if failed { report.failedSteps.append("orphanDirectories") }
         } catch {
             report.failedSteps.append("orphanDirectories")
         }
 
-        report.stagingDirectoriesDeleted = files.clearStaging(keeping: keepingStaging)
+        let staging = files.clearStaging(keeping: keepingStaging)
+        report.stagingDirectoriesDeleted = staging.removed
+        if staging.failed > 0 { report.failedSteps.append("staging") }
         return report
     }
 }

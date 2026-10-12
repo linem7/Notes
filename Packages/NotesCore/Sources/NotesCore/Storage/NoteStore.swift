@@ -6,7 +6,8 @@ import GRDB
 /// 目录结构：`<directory>/notes.sqlite`、`<directory>/materials/<noteID>/`、`<directory>/staging/`。
 /// App 里 directory 是 `~/Library/Application Support/com.linem7.Notes/`。
 public final class NoteStore: NoteStoring, Sendable {
-    private let database: DatabasePool
+    /// 测试里直接查表用（比如确认外键开着、级联删除生效）。
+    let database: DatabasePool
     private let files: MaterialFiles
     private let clock: @Sendable () -> Date
 
