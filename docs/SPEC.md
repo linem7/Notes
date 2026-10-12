@@ -50,9 +50,11 @@
     - File：用系统默认 app 打开存储里的副本；
     - Web Page：点击打开原始 URL；旁边一个按钮打开本地 PDF 快照（快照失败时不显示），一个按钮查看抽出的正文；
     - Source：默认折叠，展开后在原地显示原文（纯文本、可选中复制）。
-- **编辑**：展开后点「Edit」进入编辑：Title 单行、Due Date 日期选择器（可清除、可选时间）、Detail 多行纯文本（Markdown 源码）。可以删除单个 Material，也可以往已有 Note 拖入新的 File。⌘⏎ 或「Done Editing」保存，Esc 放弃。
+- **编辑**：展开后点「Edit」进入编辑：Title 单行、Due Date 日期选择器（可清除、可选时间）、Detail 多行纯文本（Markdown 源码）。可以删除单个 Material，也可以往已有 Note 拖入新的 File。⌘⏎、「Done Editing」或**失焦（点 Board 的别处、切到别的 app）都会保存**；Esc 放弃修改。
+- **展开**：同时只展开一条 Note，展开另一条时前一条收起（正在编辑的先按失焦规则保存）。
+- **保存失败**：数据库写入失败时，界面回到修改前的值，Board 顶部出现一条红色的「Couldn't save」提示，几秒后自动消失；不弹窗。
 - **完成**：点勾选框立即进入 Done 区；在 Done 区取消勾选回到原组。
-- **删除**：右键菜单 Delete，或选中后按 ⌫；不弹确认（同 Chatbot 的删除习惯）。连同 Material 一起删除。
+- **删除**：右键菜单 Delete，或点击选中这一行后按 ⌫（正在编辑文字时 ⌫ 只删字；只是展开不算选中）；不弹确认（同 Chatbot 的删除习惯）。连同 Material 一起删除。
 - **自动清理**：完成超过 **30 天**的 Note 连同 Material 静默删除。app 启动时检查一次，之后每天一次。
 
 ## 3. Quick Add
@@ -89,7 +91,7 @@
   - 还没有 Draft 时，**跳过模型**，直接把输入保存成一条 Note：Title 是输入的第一行（最多 80 字符），Detail 是其余部分，没有 Due Date，所有 Material 都挂上，不生成 Source。
 - 可以改了输入再按 ⏎ 重新 Organize，新结果替换旧 Draft。
 - 保存后 Board 上立刻出现新 Note，并短暂高亮。
-- **Material 和 Draft 的对应**：模型为每条 Draft 指明它用到哪些 Material；没指明的默认全部挂上。每条 Draft 都挂一份 Source（原文）。同一个 File 挂到多条 Note 时各存一份副本。
+- **Material 和 Draft 的对应**：模型为每条 Draft 指明它用到哪些 Material；没指明的默认全部挂上。每条 Draft 都挂一份 Source（原文）。同一个 File（以及同一份 Source、同一个 Web Page 的正文和快照）挂到多条 Note 时**只存一份**，几条 Note 共用；最后一条用到它的 Note 删除后才删文件。
 - 输入只有 Material、没有文字时也可以 Organize。
 
 ### 3.4 面板内快捷键
@@ -124,8 +126,8 @@
 
 - 全部在本地：`~/Library/Application Support/com.linem7.Notes/`
   - `notes.sqlite`：Note 和 Material 的记录；
-  - `materials/<noteID>/`：File 的副本、Web Page 的正文和 PDF 快照、Source 原文。
-- 删除 Note（手动或 30 天清理）时一起删掉它的目录。
+  - `materials/files/`：File 的副本、Web Page 的正文和 PDF 快照、Source 原文。几条 Note 可以共用同一个文件。
+- 删除 Note（手动或 30 天清理）后，没有任何 Note 再用到的文件随之删除。
 - 不做 iCloud 同步、导出、导入。
 
 ## 6. 语言

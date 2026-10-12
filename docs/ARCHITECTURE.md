@@ -77,7 +77,7 @@ struct Material: Identifiable, Sendable {
     var noteID: UUID
     var kind: MaterialKind
     var displayName: String       // 文件名 / 网页标题（抓取失败时是 URL）/ "Source"
-    var storedFile: String?       // materials/<noteID>/ 下的文件名：File 的副本、Source 的 .txt
+    var storedFile: String?       // materials/files/ 下的文件名：File 的副本、Source 的 .txt（可被多条 Material 共用）
     var url: String?              // Web Page
     var textFile: String?         // Web Page 抽出的正文 .txt
     var snapshotFile: String?     // Web Page 的 PDF 快照
@@ -95,16 +95,22 @@ material(id TEXT PK, noteID → note ON DELETE CASCADE, kind, displayName, store
 ```
 
 - 时间列存 `timeIntervalSinceReferenceDate`（同 Chatbot）。
-- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`（只写 title / due / detail，完成状态只经 `setDone`）、`setDone(id, at:)`、`delete(id)`、`addMaterial(noteID:from:)`（复制文件并插入 File 记录）、`addMaterial(_ material:)`（文件已在 Note 目录里的记录，Source 和 Web Page 用）、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`。
-- 删除 Note 时先删记录再删 `materials/<noteID>/` 目录；`MaterialFiles` 负责目录的创建、复制、删除。启动时清理一次没有对应记录的孤儿目录。
+- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`（只写 title / due / detail，完成状态只经 `setDone`）、`setDone(id, at:)`、`delete(id)`、`addMaterial(noteID:from:)`（把文件写进 `materials/files/` 并插入 File 记录）、`addMaterial(_ material:)`（文件已在 `materials/files/` 里的记录，Source、Web Page 和共享的 File 用）、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`、`referencedFileNames()`。
+- 删除 Note 时只删记录（material 级联删除），然后调用 `MaterialFiles.collectGarbage(referenced:)` 删掉不再被任何 material 行引用的文件（§3.3）。启动时也跑一次。
 - 没有全文搜索（v1 不做搜索）。
 
-### 3.3 Material 文件
+### 3.3 Material 文件（共享存储，2026-10-12 用户决定）
 
-- `materials/<noteID>/<materialID>.<原扩展名>`：File 副本；
-- `materials/<noteID>/<materialID>-source.txt`：Source；
-- `materials/<noteID>/<materialID>.txt` 和 `<materialID>.pdf`：Web Page 的正文和快照。
-- Quick Add 期间加入的 File 先复制到 `staging/<sessionID>/`，保存 Note 时复制到各自的 Note 目录（一个 File 挂到多条 Note 时各一份），保存或清空后删掉 staging。启动时清空 `staging/`。
+- 所有 Material 的文件都放在同一个目录 `materials/files/`，不再按 Note 分目录：
+  - File 副本：`<fileID>.<原扩展名>`（bundle 目录如 `.pages` 也按原样复制）；
+  - Source：`<fileID>-source.txt`；
+  - Web Page：`<fileID>.txt`（正文）和 `<fileID>.pdf`（快照）。
+- `fileID` 是保存时新生成的 UUID，和 Material 的 id 无关。**同一次保存里，一个 staging 文件只写进 `files/` 一次**；一次 Organize 拆成多条 Note 时，各条的 Material 行（各自的 id、各自的 noteID）引用同一个文件名。同一份 Source 和同一个 Web Page 的正文、快照同理。
+- 往已有 Note 拖入的 File 也写进 `files/`，引用计数为 1。
+- **删除只删行，不直接删文件**。文件由 `collectGarbage(referenced: Set<String>)` 回收：列出 `files/` 下的所有条目，删掉不在 `referenced`（所有 material 行的 storedFile / textFile / snapshotFile 的并集）里的。调用时机：删除 Note、删除单个 Material、30 天清理、删除所有已完成 Note 之后，以及启动时。`NoteStore` 提供 `referencedFileNames()`。
+- 写入顺序：先写文件，再在一个事务里插入记录；事务失败时，刚写的文件会在下一次 collectGarbage 时被回收，不会留下指向不存在文件的记录。
+- Quick Add 期间加入的 File 先复制到 `staging/<sessionID>/`，保存后删掉 staging。启动时清空 `staging/`。
+- 迁移：v1 尚未发布，直接改 #14 合入的 `MaterialFiles`（去掉按 Note 分目录的 `directory(for:)`、`removeNoteDirectory`、`removeFiles(of:)`），不需要数据迁移。
 
 ## 4. Organize
 
@@ -196,7 +202,7 @@ Readable Text……
 - 移植 Chatbot 的 `QuickPanel`（`.nonactivatingPanel` + `.borderless`、`level = .floating`、失焦隐藏、`performDrag`、偏上居中定位）、`QuickPanelController` 和 `ComposerTextView`（⏎ / ⇧⏎ / 输入法组字处理），把快捷键表换成 SPEC §3.4；去掉「固定」图钉。
 - `QuickAddStore`（`@MainActor @Observable`）：`inputText`、`materials: [StagedMaterial]`、`phase`（idle / organizing / drafts([Draft]) / failed(ChatError)）、`organizeTask`。
 - Organize：等待所有 pending 的 Readable Text 完成（最多 30 秒，超时的当 unavailable）后组装请求。
-- 保存：生成 Note 和 Material 记录，复制 staging 文件到 Note 目录，写 Source（原文 .txt），Web Page 写正文和快照，一个事务插入；成功后清空 store、删 staging、隐藏面板，通知 Board 高亮新 Note。
+- 保存：每个 staging 文件只写一次到 `materials/files/`，生成 Note 和 Material 记录（多条 Note 引用同一文件名），写 Source（原文 .txt），Web Page 写正文和快照，一个事务插入；成功后清空 store、删 staging、隐藏面板，通知 Board 高亮新 Note。
 - 打开文件面板时的激活处理同 Chatbot（`yieldActivation`）。
 
 ## 9. 系统集成
@@ -207,7 +213,7 @@ Readable Text……
 - **API key**：Keychain service `com.linem7.Notes.apikey`，account 为 Connection ID（移植 `APIKeyStore`）。
 - **开机启动**：`SMAppService.mainApp`（移植）。
 - **普通窗口**（设置）：移植 `RegularWindows`，打开时 `.regular`，关掉后 `.accessory`。
-- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和孤儿目录（没有对应记录的 `materials/<uuid>/`）。孤儿目录有 10 分钟宽限期（按目录修改时间）：保存 Note 时先写文件再插记录，启动时的清理不能把刚崩溃前写下的目录当孤儿误删。
+- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和 `collectGarbage`。`collectGarbage` 对修改时间在 10 分钟内的文件有宽限期：保存 Note 时先写文件再插记录，不能把刚写下、记录还没插入的文件当成无人引用误删。
 
 ## 10. 需要真机核实的事
 
