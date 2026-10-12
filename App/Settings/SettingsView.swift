@@ -42,7 +42,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Hotkey") {
                     KeyboardShortcuts.Recorder(for: .quickAdd) { shortcut = $0 }
                 }
-                Text("If nothing happens when you press the Hotkey, it may conflict with another app. Try a different combination.")
+                Text(Hotkey.otherAppsHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 // 只有 option 的组合（默认 option+N）在美式键盘上本来是输入特殊字符，比如 ñ（SPEC §3.1）

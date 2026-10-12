@@ -31,6 +31,46 @@
         }
       }
     },
+    "Add Due Date" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加截止日期"
+          }
+        }
+      }
+    },
+    "Add Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件"
+          }
+        }
+      }
+    },
+    "Add Time" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加时间"
+          }
+        }
+      }
+    },
+    "Add a Connection first to let the model organize your notes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先添加 Connection，才能让模型整理 Note。"
+          }
+        }
+      }
+    },
     "Add a Connection with the + button, then paste your API key." : {
       "localizations" : {
         "zh-Hans" : {
@@ -121,12 +161,42 @@
         }
       }
     },
+    "Cancel (⌘.)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消（⌘.）"
+          }
+        }
+      }
+    },
     "Choose a Default Model for Organize." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "请为 Organize 选择一个默认模型。"
+          }
+        }
+      }
+    },
+    "Clear" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空"
+          }
+        }
+      }
+    },
+    "Clear Due Date" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除截止日期"
           }
         }
       }
@@ -141,12 +211,32 @@
         }
       }
     },
+    "Couldn't add this file." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法添加这个文件。"
+          }
+        }
+      }
+    },
     "Couldn't delete the Notes." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法删除 Note。"
+          }
+        }
+      }
+    },
+    "Couldn't load the page." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载网页。"
           }
         }
       }
@@ -311,6 +401,16 @@
         }
       }
     },
+    "Detail" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详情"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "zh-Hans" : {
@@ -412,11 +512,14 @@
       }
     },
     "Hotkey" : {
+      "localizations" : {}
+    },
+    "Hotkey %@ is used by macOS" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "快捷键"
+            "value" : "Hotkey %@ 已被 macOS 占用"
           }
         }
       }
@@ -506,7 +609,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有连接"
+            "value" : "还没有配置连接"
           }
         }
       }
@@ -527,6 +630,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还没有模型。保存即可拉取，或在下方手动添加模型 ID。"
+          }
+        }
+      }
+    },
+    "No text was recognized." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有识别出文字。"
           }
         }
       }
@@ -576,7 +689,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在桌面"
+            "value" : "On Desktop"
           }
         }
       }
@@ -586,7 +699,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“在桌面”让看板像便笺一样留在其他窗口后面；“置顶”让它始终在其他窗口上方。"
+            "value" : "On Desktop 让看板像便笺一样留在其他窗口后面；On Top 让它始终在其他窗口上方。"
           }
         }
       }
@@ -596,7 +709,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "置顶"
+            "value" : "On Top"
           }
         }
       }
@@ -631,6 +744,16 @@
         }
       }
     },
+    "Open Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置…"
+          }
+        }
+      }
+    },
     "Organize Prompt" : {
       "localizations" : {
         "zh-Hans" : {
@@ -641,12 +764,42 @@
         }
       }
     },
+    "Organizing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在整理…"
+          }
+        }
+      }
+    },
+    "Organizing… %lld characters" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在整理…已收到 %lld 个字"
+          }
+        }
+      }
+    },
     "Overdue" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已逾期"
+          }
+        }
+      }
+    },
+    "Paste a chat, drop a file, or type what you need to do" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴聊天记录、拖入文件，或直接写下要做的事"
           }
         }
       }
@@ -671,12 +824,42 @@
         }
       }
     },
+    "Preparing the text was cancelled." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消读取文字。"
+          }
+        }
+      }
+    },
     "Press your Hotkey or click + to add a note." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "按 Hotkey 或点 + 添加 Note。"
+          }
+        }
+      }
+    },
+    "Pressing it won't open Quick Add. Turn off that shortcut in System Settings › Keyboard › Keyboard Shortcuts, or choose another Hotkey in Notes' settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按它不会打开 Quick Add。请在「系统设置 › 键盘 › 键盘快捷键」里关掉那个快捷键，或在 Notes 的设置里换一个 Hotkey。"
+          }
+        }
+      }
+    },
+    "Quick Add" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速添加"
           }
         }
       }
@@ -731,12 +914,32 @@
         }
       }
     },
+    "Remove Time" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除时间"
+          }
+        }
+      }
+    },
     "Restore Default" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复默认"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
           }
         }
       }
@@ -751,12 +954,42 @@
         }
       }
     },
+    "Save %lld Notes (⌘⏎)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存 %lld 条 Note（⌘⏎）"
+          }
+        }
+      }
+    },
+    "Save 1 Note (⌘⏎)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存 1 条 Note（⌘⏎）"
+          }
+        }
+      }
+    },
     "Save Without Testing" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "不测试直接保存"
+          }
+        }
+      }
+    },
+    "Save this note" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存这条 Note"
           }
         }
       }
@@ -777,6 +1010,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存时会拉取模型列表，这同时也是连接测试。"
+          }
+        }
+      }
+    },
+    "Saving…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在保存…"
           }
         }
       }
@@ -871,12 +1114,52 @@
         }
       }
     },
+    "The input is too long for this model. Remove some text or files and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入对这个模型来说太长了。去掉一些文字或文件后重试。"
+          }
+        }
+      }
+    },
+    "The page has no readable text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页没有可读的正文。"
+          }
+        }
+      }
+    },
     "The service is temporarily unavailable." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务暂时不可用。"
+          }
+        }
+      }
+    },
+    "This PDF is password-protected." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个 PDF 有密码。"
+          }
+        }
+      }
+    },
+    "This file type can't be read. It is saved, and the model only sees its name." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取这种文件。文件会保存，模型只能看到文件名。"
           }
         }
       }
@@ -967,6 +1250,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "昨天"
+          }
+        }
+      }
+    },
+    "You can still save the input as is with ⌘⏎." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然可以按 ⌘⏎ 原样保存输入。"
+          }
+        }
+      }
+    },
+    "⏎ Organize again · ⌘⏎ Save · ⇧⏎ New line" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⏎ 重新整理 · ⌘⏎ 保存 · ⇧⏎ 换行"
+          }
+        }
+      }
+    },
+    "⏎ Organize · ⌘⏎ Save as is · ⇧⏎ New line" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⏎ 整理 · ⌘⏎ 原样保存 · ⇧⏎ 换行"
           }
         }
       }

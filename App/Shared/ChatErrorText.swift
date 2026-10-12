@@ -19,7 +19,7 @@ extension ChatError {
         case .network:
             String(localized: "Network connection failed.")
         case .contextTooLong:
-            String(localized: "The input is too long for this model.")
+            String(localized: "The input is too long for this model. Remove some text or files and try again.")
         case .invalidRequest(let raw), .providerError(let raw):
             raw
         }
