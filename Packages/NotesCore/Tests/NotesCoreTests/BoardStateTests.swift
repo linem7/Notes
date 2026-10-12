@@ -138,13 +138,15 @@ struct BoardStateTests {
         #expect(state.editingID == a)  // 用户输入还在
         #expect(state.expandedID == a)  // 没有去展开 b
         // 再点一次会重试
-        #expect(!state.requestToggle(b))
+        let t1 = state.requestToggle(b)
+        #expect(!t1)
         state.saveFinished(id: a, succeeded: false)
         #expect(state.editingID == a)
         // Esc 永远能退出，之后可以正常展开别的行
         state.cancelEditing()
         #expect(state.editingID == nil)
-        #expect(state.requestToggle(c))
+        let t2 = state.requestToggle(c)
+        #expect(t2)
         #expect(state.expandedID == c)
     }
 
@@ -185,7 +187,8 @@ struct BoardStateTests {
         #expect(state.selectedID == nil)
         #expect(state.deletableID == nil)  // ⌫ 不会删到看不见的 Note
         state.setEditorAvailable(false)  // 编辑器消失
-        #expect(state.requestToggle(b))
+        let t3 = state.requestToggle(b)
+        #expect(t3)
         #expect(state.expandedID == b)
     }
 
@@ -198,7 +201,8 @@ struct BoardStateTests {
         state.setEditorAvailable(false)
         state.saveFinished(id: a, succeeded: false)  // 失败的结果晚到
         #expect(state.editingID == nil)
-        #expect(state.requestToggle(c))
+        let t4 = state.requestToggle(c)
+        #expect(t4)
         #expect(state.expandedID == c)
     }
 
@@ -207,12 +211,14 @@ struct BoardStateTests {
         state.setEditorAvailable(true)
         state.setEditorAvailable(false)
         #expect(state.editingID == nil)
-        #expect(state.requestToggle(b))
+        let t5 = state.requestToggle(b)
+        #expect(t5)
     }
 
     @Test func requestToggleRecoversWhenEditorNeverAppeared() {
         var state = editing(a)  // beginEditing 之后编辑器还没出现
-        #expect(state.requestToggle(b))
+        let t6 = state.requestToggle(b)
+        #expect(t6)
         #expect(state.editingID == nil)
         #expect(state.expandedID == b)
     }
