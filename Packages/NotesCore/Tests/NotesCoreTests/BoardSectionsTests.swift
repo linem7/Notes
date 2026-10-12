@@ -116,4 +116,22 @@ struct BoardSectionsTests {
         ], today: today, calendar: cal)
         #expect(count == 2)
     }
+
+    @Test(arguments: ["", "2026-13-40", "2026-02-30", "2026-1-5", "tomorrow", "2026/10/13", "２０２６-１０-１３"])
+    func anInvalidDueDayIsTreatedAsNoDate(day: String) {
+        let cal = calendar()
+        let today = date(2026, 10, 12, calendar: cal)
+        let notes = [item("bad", due: DueDate(day: day, time: "09:00")), item("late", due: DueDate(day: "2026-10-01"))]
+        let sections = BoardSections.sections(for: notes, today: today, calendar: cal)
+        #expect(titles(sections, .noDate) == ["bad"])
+        #expect(titles(sections, .overdue) == ["late"])
+        #expect(BoardSections.badgeCount(for: notes, today: today, calendar: cal) == 1)
+    }
+
+    @Test func aLeapDayIsValid() {
+        let cal = calendar()
+        let today = date(2028, 2, 28, calendar: cal)
+        let sections = BoardSections.sections(for: [item("leap", due: DueDate(day: "2028-02-29"))], today: today, calendar: cal)
+        #expect(titles(sections, .upcoming) == ["leap"])
+    }
 }

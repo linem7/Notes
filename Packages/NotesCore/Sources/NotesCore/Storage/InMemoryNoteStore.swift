@@ -22,6 +22,9 @@ public actor InMemoryNoteStore: NoteStoring {
         }
     }
 
+    /// 还在登记的订阅者个数。测试用，确认取消后订阅确实被清理。
+    var subscriberCount: Int { subscribers.count }
+
     public func allNotes() -> [NoteWithMaterials] {
         let byNote = Dictionary(grouping: materials.values, by: \.noteID)
         return notes.values
@@ -145,8 +148,9 @@ public actor InMemoryNoteStore: NoteStoring {
     }
 
     private func subscribe(_ id: UUID, _ continuation: AsyncStream<[NoteWithMaterials]>.Continuation) {
+        // 订阅方在这一步执行之前就取消了：onTermination 里的 unsubscribe 已经跑过，这里不能再把它登记进去
+        if case .terminated = continuation.yield(allNotes()) { return }
         subscribers[id] = continuation
-        continuation.yield(allNotes())
     }
 
     private func unsubscribe(_ id: UUID) {
