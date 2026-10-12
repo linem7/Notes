@@ -100,5 +100,5 @@ while security delete-generic-password -s com.linem7.Notes.apikey >/dev/null 2>&
 - **改了界面语言没变化**：切换语言后需要重启，点 **Relaunch**。Note 的语言跟随输入，与界面语言无关。
 - **系统不显示 Open Anyway**：先从 Applications 尝试打开一次，再查看 Privacy & Security；受组织管理的 Mac 可能限制此操作，需要联系管理员。
 - **Board 顶部出现红色「Couldn't save」**：数据库写入失败，修改已回到之前的值，几秒后提示自动消失。请重试；反复出现请到 Issues 反馈（附系统版本，磁盘空间是否充足）。
-- **Board 顶部出现错误 `Notes can't open its data`**：Notes 打不开数据目录（例如权限问题或磁盘不可写）。此时 Board 显示该错误，并提供 **Show in Finder** 和 **Retry** 两个按钮，保存被禁用。先点 **Retry** 重试，仍不行就用 **Show in Finder** 到 Finder 里检查数据目录。
+- **Board 顶部出现错误 `Notes can't open its data`**：数据库打不开（文件损坏等），Notes 无法读写 Note。此时 Board 显示该错误，并提供 **Show in Finder** 和 **Retry** 两个按钮；Quick Add 也不能保存（按保存会失败并显示红色「Couldn't save」，输入保留）。先点 **Retry** 重试，仍不行就用 **Show in Finder** 到 Finder 里检查数据目录。
 - **遇到其他问题**：到 [GitHub Issues](https://github.com/linem7/Notes/issues) 描述 macOS 版本、应用版本和复现步骤。截图或错误信息中请隐去 API key 和 Note 中的隐私内容。
