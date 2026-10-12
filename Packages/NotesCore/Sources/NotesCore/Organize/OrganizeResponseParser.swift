@@ -53,10 +53,18 @@ public enum OrganizeResponseParser {
         return nil
     }
 
+    /// 只去掉围栏标记本身，内容一个字都不删：行首的 ```lang（语言标记后面可以直接跟 JSON）和行尾的 ```。
+    /// 模型有时把围栏和 JSON 写在同一行，如 ```json{"notes": […]}```。
     private static func stripFences(_ raw: String) -> String {
-        raw.split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("```") }
-            .joined(separator: "\n")
+        raw.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+            var text = line.trimmingCharacters(in: .whitespaces)
+            if text.hasPrefix("```") {
+                text.removeFirst(3)
+                text = String(text.drop { $0.isASCII && ($0.isLetter || $0.isNumber) || "_+-".contains($0) })
+            }
+            if text.hasSuffix("```") { text.removeLast(3) }
+            return text
+        }.joined(separator: "\n")
     }
 
     private static func json(in raw: String, from open: Character, to close: Character) -> Any? {

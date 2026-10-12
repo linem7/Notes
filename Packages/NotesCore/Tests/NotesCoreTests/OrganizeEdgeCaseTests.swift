@@ -25,6 +25,24 @@ struct OrganizeParserEdgeCaseTests {
         #expect(drafts.map(\.title) == ["A"])
     }
 
+    @Test(arguments: [
+        "```json\n{\"notes\":[{\"title\":\"A\"}]}\n```",     // 围栏单独成行
+        "```json{\"notes\":[{\"title\":\"A\"}]}```",           // 围栏和 JSON 同一行
+        "```json\n{\"notes\":[{\"title\":\"A\"}]}```",        // 开头围栏单独成行，结尾围栏跟在内容后
+        "```json{\"notes\":[{\"title\":\"A\"}]}\n```",        // 开头围栏跟在内容前，结尾围栏单独成行
+        "```{\"notes\":[{\"title\":\"A\"}]}```",               // 没有语言标记
+        "  ```JSON  \n{\"notes\":[{\"title\":\"A\"}]}\n  ```  ",
+        "```json[{\"title\":\"A\"}]```",                          // 同一行的裸数组
+    ])
+    func step1_fenceMarkersAreRemovedButContentIsNeverDropped(raw: String) {
+        #expect(parse(raw).map(\.title) == ["A"])
+    }
+
+    @Test func fencesInsideAJSONStringAreLeftAlone() {
+        let raw = "{\"notes\":[{\"title\":\"A\",\"detail\":\"```sh\\nls\\n```\"}]}"
+        #expect(parse(raw).first?.detail == "```sh\nls\n```")
+    }
+
     @Test func step1_aBareArrayIsAcceptedAsTheNotes() {
         let drafts = parse("[\(single), {\"title\": \"B\"}]", materialCount: 2)
         #expect(drafts.map(\.title) == ["A", "B"])
