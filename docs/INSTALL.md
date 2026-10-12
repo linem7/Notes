@@ -2,7 +2,7 @@
 
 > **草稿**：随 v0.1.0 打包前定稿。功能描述以 [SPEC](SPEC.md) 为准；标 `TODO` 的地方要等对应 issue 落地、真机核实后补全。
 >
-> 合并状态（2026-10-12，基线 `main` `7237a8b`）：Board 和 NotesCore 已在 `main`；本文写到的 Quick Add（#9，PR #22）、菜单栏 / 设置 / 首次启动 / 界面语言（#10，PR #23）还没合并，它们的界面文案和位置以合并后的代码为准。文中每处界面名称都能在 SPEC、ARCHITECTURE 或代码里找到来源；只在真机上才能确认的另标 `TODO`。
+> 合并状态（2026-10-12，基线 `main` `b91f901`）：本文写到的全部功能都已并入 `main` —— Board 和 NotesCore、Quick Add（#9，PR #22）、菜单栏 / 设置 / 首次启动 / 界面语言（#10，PR #23）、数据库打不开时的 Board 纠错态（#33，PR #35）。文中每处界面名称、按钮名和快捷键都已对照 `main` 的 app 源核过；只在真机上才能确认的另标 `TODO`。
 
 ## 系统要求
 
@@ -48,7 +48,7 @@ Notes 不发系统通知、不接日历、不做提醒。
 | 菜单栏菜单的 **Settings…** 项 | ⌘, | 打开 Settings。菜单里有 **Settings…** 项，快捷键 ⌘, 挂在这一项上；除此之外 ⌘, 还能在什么情况下打开 Settings，TODO：真机核实 |
 
 - 默认 **Option + N** 不需要 Accessibility 或 Screen Recording 权限。在美式键盘上 option+N 原本用来输入 ñ，注册后这个组合不再打字；如果和其他应用冲突，在 **Settings › General › Hotkey** 换一个组合。启动和改键时会检测与系统快捷键的冲突。
-- TODO（#7 / #10 落地后核实）：各项权限提示，例如网页抓取、OCR 是否会触发任何系统授权弹窗；目前 SPEC 预期无需额外权限。
+- TODO（真机核实）：各项权限提示，例如网页抓取、OCR 是否会触发任何系统授权弹窗；目前 SPEC 预期无需额外权限（已在 `main` 的代码里确认未申请 Accessibility / Screen Recording 等权限）。
 
 ## 数据保存在哪里
 
@@ -100,4 +100,5 @@ while security delete-generic-password -s com.linem7.Notes.apikey >/dev/null 2>&
 - **改了界面语言没变化**：切换语言后需要重启，点 **Relaunch**。Note 的语言跟随输入，与界面语言无关。
 - **系统不显示 Open Anyway**：先从 Applications 尝试打开一次，再查看 Privacy & Security；受组织管理的 Mac 可能限制此操作，需要联系管理员。
 - **Board 顶部出现红色「Couldn't save」**：数据库写入失败，修改已回到之前的值，几秒后提示自动消失。请重试；反复出现请到 Issues 反馈（附系统版本，磁盘空间是否充足）。
+- **Board 顶部出现错误 `Notes can't open its data`**：Notes 打不开数据目录（例如权限问题或磁盘不可写）。此时 Board 显示该错误，并提供 **Show in Finder** 和 **Retry** 两个按钮，保存被禁用。先点 **Retry** 重试，仍不行就用 **Show in Finder** 到 Finder 里检查数据目录。
 - **遇到其他问题**：到 [GitHub Issues](https://github.com/linem7/Notes/issues) 描述 macOS 版本、应用版本和复现步骤。截图或错误信息中请隐去 API key 和 Note 中的隐私内容。
