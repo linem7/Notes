@@ -1,6 +1,8 @@
 # Notes 安装指引
 
 > **草稿**：随 v0.1.0 打包前定稿。功能描述以 [SPEC](SPEC.md) 为准；标 `TODO` 的地方要等对应 issue 落地、真机核实后补全。
+>
+> 合并状态（2026-10-12，基线 `main` `7237a8b`）：Board 和 NotesCore 已在 `main`；本文写到的 Quick Add（#9，PR #22）、菜单栏 / 设置 / 首次启动 / 界面语言（#10，PR #23）还没合并，它们的界面文案和位置以合并后的代码为准。文中每处界面名称都能在 SPEC、ARCHITECTURE 或代码里找到来源；只在真机上才能确认的另标 `TODO`。
 
 ## 系统要求
 
@@ -27,7 +29,7 @@
 4. 桌面右侧会出现 **Board**（默认 On Desktop，像 Stickies 钉在桌面上，回到桌面时可见）。按 **Option + N** 唤起 **Quick Add**：粘贴聊天记录、拖入文件、贴链接，或直接打一句话，按 **⏎** 让模型整理成 Note（标题 + 截止日期 + 要点），检查后按 **⌘⏎** 保存。
 5. 还没配置 Connection 也能用：不按 ⏎，直接按 **⌘⏎** 会把输入原样保存成一条 Note。
 
-Notes 平时在菜单栏里，不出现在 Dock 和 ⌘Tab；只有打开 Settings 时才临时出现。菜单栏图标旁的数字是今天到期和已逾期的未完成 Note 数量。首次启动默认开启 **Launch at Login**，可在 **Settings › General** 关闭；系统可能显示 **Background Items Added** 通知，这是系统行为。
+Notes 平时在菜单栏里，不出现在 Dock 和 ⌘Tab；只有打开 Settings 时才临时出现。菜单栏图标旁的数字是今天到期和已逾期的未完成 Note 数量。首次启动默认开启 **Launch at Login**，可在 **Settings › General** 关闭；开启时系统可能显示 **Background Items Added** 通知，这是 macOS 对登录项的处理（TODO：真机核实文案）。
 
 Notes 不发系统通知、不接日历、不做提醒。
 
@@ -43,7 +45,7 @@ Notes 不发系统通知、不接日历、不做提醒。
 | Quick Add | Esc | 隐藏面板（Organize 进行中时先取消） |
 | Board（Note 编辑） | ⌘⏎ / Esc | 保存 / 放弃修改；点 Board 别处或切到别的 app（失焦）也会保存 |
 | Board（点击选中 Note，未在编辑文字） | ⌫ | 删除 Note，不弹确认；只是展开不算选中，编辑文字时 ⌫ 只删字 |
-| 菜单栏菜单打开时 | ⌘, | 打开 Settings（Notes 平时不在前台，没有菜单栏菜单时不起作用；TODO：真机核实） |
+| 菜单栏菜单打开时 | ⌘, | 打开 Settings。这个组合挂在菜单栏菜单的 **Settings…** 项上，Notes 平时不在前台，菜单没打开时不起作用（TODO：真机核实） |
 
 - 默认 **Option + N** 不需要 Accessibility 或 Screen Recording 权限。在美式键盘上 option+N 原本用来输入 ñ，注册后这个组合不再打字；如果和其他应用冲突，在 **Settings › General › Hotkey** 换一个组合。启动和改键时会检测与系统快捷键的冲突。
 - TODO（#7 / #10 落地后核实）：各项权限提示，例如网页抓取、OCR 是否会触发任何系统授权弹窗；目前 SPEC 预期无需额外权限。
@@ -55,7 +57,7 @@ Notes 不发系统通知、不接日历、不做提醒。
 - `notes.sqlite`：Note 和 Material 的记录；
 - `materials/files/`：加入的文件副本、网页正文和 PDF 快照、粘贴的原文。同一个文件挂到多条 Note 时只存一份，最后一条用到它的 Note 删除后才删文件。
 
-可在 **Settings › Advanced** 的「打开数据目录」在 Finder 中显示（按钮实际文案以 #10 实现为准，真机核实）。完成超过 30 天的 Note 连同 Material 会静默自动删除。不做 iCloud 同步，也不做导出导入。
+可在 **Settings › Advanced** 的 **Data Folder** 行点 **Show in Finder**，在 Finder 里显示这个目录。完成超过 30 天的 Note 连同 Material 会静默自动删除。不做 iCloud 同步，也不做导出导入。
 
 聊天记录、文件、网页内容中的文字会发送给你配置的模型服务做 Organize；原始文件本身不会上传（图片 / 扫描版 PDF 在本机用 Apple Vision 做 OCR，只发送识别出的文字）。
 

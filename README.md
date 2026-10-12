@@ -24,7 +24,7 @@ A macOS desktop task-note app. Pin the board to your desktop, or press **Option 
 
 **不做**：系统通知和日历、模型思考和联网搜索、读取 Word / Excel / PPT、搜索和标签、iCloud 同步、自动更新（详见 SPEC §10）。
 
-**Status:** v1 in development (project skeleton: menu bar icon + Quit only). See [docs/SPEC.md](docs/SPEC.md) (spec), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (implementation), [CONTEXT.md](CONTEXT.md) (glossary), [docs/adr/](docs/adr/) (decisions).
+**Status:** v1 in development. On `main`: NotesCore and the Board. Quick Add (#9, PR #22), and the menu bar, Settings and interface language (#10, PR #23) are still open PRs — until they merge this is not a usable app. See [docs/SPEC.md](docs/SPEC.md) (spec), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (implementation), [CONTEXT.md](CONTEXT.md) (glossary), [docs/adr/](docs/adr/) (decisions).
 
 Requirements: macOS 26+, Apple Silicon, your own API key (DeepSeek or any OpenAI-compatible service).
 
