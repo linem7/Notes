@@ -125,8 +125,10 @@ public struct MaterialFiles: Sendable {
             at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
         )) ?? []
         for url in urls where !referenced.contains(url.lastPathComponent) {
-            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            if now.timeIntervalSince(modified) <= Self.garbageGracePeriod {
+            // 读不到修改时间就当作新的留着：删错了是丢用户的文件，留着只是晚一点回收
+            if let modified = modificationDate(of: url), now.timeIntervalSince(modified) > Self.garbageGracePeriod {
+                // 超过宽限期，往下删
+            } else {
                 report.keptInGracePeriod += 1
                 continue
             }
@@ -168,7 +170,8 @@ public struct MaterialFiles: Sendable {
 
     /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件），返回删掉和失败的个数。
     ///
-    /// `respectingGracePeriod`（默认 true）为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟）之内的条目。
+    /// `respectingGracePeriod`（默认 true）为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟，刚好 10 分钟还算新）之内、
+    /// 或者读不到修改时间的条目。
     /// 默认选安全的一边：忘了传只会清得慢一点，不会删掉用户刚加的文件。24 小时清理用它：清理先读到「正在用的会话」、再来删，这中间用户可能粘贴了文件，Quick Add 新建了会话目录，
     /// 它不在 `keeping` 里，不能连同用户刚加的文件一起删掉。往会话目录里加文件或删文件都会更新目录的修改时间，
     /// 所以在用的会话一直算「新」。只有启动时的清理显式传 false：这时不会有活跃的会话，全部清掉。
@@ -180,8 +183,10 @@ public struct MaterialFiles: Sendable {
         let urls = (try? FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)) ?? []
         for url in urls {
             if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
-            if respectingGracePeriod, let modified = modificationDate(of: url),
-               now.timeIntervalSince(modified) <= Self.garbageGracePeriod { continue }
+            // 带宽限期时：修改时间读不到也留着（和 collectGarbage 一样，宁可晚点清，不删用户的文件）
+            if respectingGracePeriod {
+                guard let modified = modificationDate(of: url), now.timeIntervalSince(modified) > Self.garbageGracePeriod else { continue }
+            }
             do {
                 try FileManager.default.removeItem(at: url)
                 removed += 1

@@ -257,4 +257,43 @@ struct MaterialFilesTests {
         #expect(files.clearStaging(respectingGracePeriod: true).removed == 0)
         #expect(FileManager.default.fileExists(atPath: session.directory.path))
     }
+
+    // MARK: 宽限期边界（注入 now）
+
+    /// 固定的整秒时间，写进文件系统再读回来不会有舍入。
+    private let stamp = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func setModified(_ url: URL, to date: Date) throws {
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+
+    @Test func stagingEntryExactlyAtTheGracePeriodIsKeptOneSecondLaterItGoes() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        try setModified(session.directory, to: stamp)
+
+        #expect(files.clearStaging(respectingGracePeriod: true, now: stamp.addingTimeInterval(600)).removed == 0)
+        #expect(FileManager.default.fileExists(atPath: session.directory.path))
+        #expect(files.clearStaging(respectingGracePeriod: true, now: stamp.addingTimeInterval(601)).removed == 1)
+        #expect(!FileManager.default.fileExists(atPath: session.directory.path))
+    }
+
+    @Test func garbageExactlyAtTheGracePeriodIsKeptOneSecondLaterItGoes() throws {
+        let files = try makeFiles()
+        let name = try files.write(Data("x".utf8), ext: "txt")
+        try setModified(files.filesDirectory.appendingPathComponent(name), to: stamp)
+
+        let atBoundary = files.collectGarbage(referenced: [], now: stamp.addingTimeInterval(600))
+        #expect(atBoundary.removed == 0)
+        #expect(atBoundary.keptInGracePeriod == 1)
+        #expect(files.collectGarbage(referenced: [], now: stamp.addingTimeInterval(601)).removed == 1)
+        #expect(!entries(files).contains(name))
+    }
+
+    @Test func gracePeriodIsStillOffWhenNotRequestedForStaging() throws {
+        let files = try makeFiles()
+        let session = try files.makeStagingSession()
+        try setModified(session.directory, to: stamp)
+        #expect(files.clearStaging(respectingGracePeriod: false, now: stamp).removed == 1)
+    }
 }

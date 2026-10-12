@@ -213,7 +213,7 @@ Readable Text……
 - **API key**：Keychain service `com.linem7.Notes.apikey`，account 为 Connection ID（移植 `APIKeyStore`）。
 - **开机启动**：`SMAppService.mainApp`（移植）。
 - **普通窗口**（设置）：移植 `RegularWindows`，打开时 `.regular`，关掉后 `.accessory`。
-- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和 `collectGarbage`。`collectGarbage` 对修改时间在 10 分钟内的文件有宽限期：保存 Note 时先写文件再插记录，不能把刚写下、记录还没插入的文件当成无人引用误删。清 staging 时，每 24 小时那次同样跳过 10 分钟内改过的会话目录（读到「正在用的会话」之后用户可能又粘贴了文件）；宽限期参数默认开着，忘了传只会清得慢一点、不会丢用户的文件；启动时那次显式关掉，全部清掉。
+- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和 `collectGarbage`。`collectGarbage` 对修改时间在 10 分钟内的文件有宽限期：保存 Note 时先写文件再插记录，不能把刚写下、记录还没插入的文件当成无人引用误删。清理有两种时机（`MaintenanceMode`，调用方必须选）：启动时 `.startup` 清空全部 staging；每 24 小时 `.periodic(keepingStaging:)` 跳过正在使用的会话，并且和 `collectGarbage` 一样，修改时间在 10 分钟之内（刚好 10 分钟还算新）或读不到修改时间的条目都留着。
 
 ## 10. 需要真机核实的事
 
