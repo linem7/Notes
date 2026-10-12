@@ -7,6 +7,9 @@
   - **#9 Quick Add** —— PR #22，Draft，CI 红（`Test NotesCore` 挂住直到 15 分钟超时）。
   - **#10 菜单栏、设置、首次启动、界面语言、开机启动** —— PR #23，CI 绿，等 #9 合并后接 Quick Add。
   - **#11 测试补齐、INSTALL.md、v0.1.0 发布准备** —— PR #13，Draft，只含文档部分。
+- 2026-10-12：团队暂停后恢复；三层结构生效——dev-lead 只管跨部门排序 / 合并 / 维护 #1 / 汇报，frontend / backend / review 三个部门 lead 各自计划、分派、审本部门。
+- 2026-10-12：B 线、C 线改走 `git merge origin/main`，不再 rebase——rebase 已推送过的分支会产生 non-fast-forward，只能 force push，而它是 deny。C 线改为「从远端建 `issue-13-publish` 分支 + merge + fast-forward push」。
+- 2026-10-12：SPEC §2.2（数据库打不开时 Board 内纠错态 + Quick Add 禁止保存）用户定为纳入 v1，另开 issue #33，排在 #9 合并之后。
 
 ## 环境（2026-10-12 更正，重要）
 - **开发这台机器是 macOS 27.0、Xcode 27.0、Swift 6.4、XcodeGen 2.46、arm64。** 可以本地跑
