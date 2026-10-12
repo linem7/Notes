@@ -7,6 +7,8 @@ import os
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var boardController: BoardController?
+    private(set) var quickAddStore: QuickAddStore?
+    private(set) var quickAddController: QuickAddController?
     private let logger = Logger(subsystem: "com.linem7.Notes", category: "App")
 
     /// `~/Library/Application Support/com.linem7.Notes/`（SPEC §5）
@@ -17,11 +19,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
             let store = try NoteStore(directory: Self.dataDirectory)
-            let controller = BoardController(store: store, files: store.materialFiles, onAddNote: {
-                // Quick Add 在 #9 接入
+            let controller = BoardController(store: store, files: store.materialFiles, onAddNote: { [weak self] in
+                // Board 顶栏的 + 只负责打开，不是切换
+                self?.quickAddController?.show()
             })
             controller.start()
             boardController = controller
+
+            // Connection、Default Model 和 key 的来源在 #10；接上之前 Organize 一律提示先添加 Connection，⌘⏎ 原样保存可用
+            let quickAddStore = QuickAddFactory.makeStore(
+                files: store.materialFiles, noteStore: store, fetcher: WebPageFetcher(),
+                organizer: ModelDraftOrganizer(configuration: { nil })
+            )
+            quickAddStore.setHighlighter(controller)
+            self.quickAddStore = quickAddStore
+            let quickAddController = QuickAddController(store: quickAddStore)
+            self.quickAddController = quickAddController
+            Hotkey.install { quickAddController.toggle() }
+            Hotkey.warnIfTakenBySystem()
         } catch {
             logger.error("Couldn't open the note store: \(error.localizedDescription, privacy: .public)")
             showStoreOpenFailure(error)
