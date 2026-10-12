@@ -10,12 +10,15 @@ struct BoardStateTests {
 
     @Test func onlyOneRowExpandedAtATime() {
         var state = BoardState()
-        #expect(state.toggleExpanded(a))
+        let result = state.toggleExpanded(a)
+        #expect(r1)
         #expect(state.expandedID == a)
-        #expect(state.toggleExpanded(b))
+        let result = state.toggleExpanded(b)
+        #expect(r2)
         #expect(state.expandedID == b)
         #expect(state.selectedID == b)
-        #expect(state.toggleExpanded(b))
+        let result = state.toggleExpanded(b)
+        #expect(r3)
         #expect(state.expandedID == nil)
         #expect(state.selectedID == b)  // 收起后仍选中，⌫ 可用
     }
@@ -23,23 +26,31 @@ struct BoardStateTests {
     @Test func editingBlocksSwitchingAndCollapsing() {
         var state = BoardState()
         state.toggleExpanded(a)
-        #expect(state.beginEditing(a))
-        #expect(!state.toggleExpanded(b))
-        #expect(!state.toggleExpanded(a))
+        let result = state.beginEditing(a)
+        #expect(r4)
+        let result = state.toggleExpanded(b)
+        #expect(!r5)
+        let result = state.toggleExpanded(a)
+        #expect(!r6)
         #expect(state.expandedID == a)
         #expect(state.deletableID == nil)
         state.endEditing()
-        #expect(state.toggleExpanded(b))
+        let result = state.toggleExpanded(b)
+        #expect(r7)
         #expect(state.deletableID == b)
     }
 
     @Test func onlyExpandedRowCanBeEdited() {
         var state = BoardState()
-        #expect(!state.beginEditing(a))
+        let result = state.beginEditing(a)
+        #expect(!r8)
         state.toggleExpanded(a)
-        #expect(!state.beginEditing(b))
-        #expect(state.beginEditing(a))
-        #expect(!state.beginEditing(a))
+        let result = state.beginEditing(b)
+        #expect(!r9)
+        let result = state.beginEditing(a)
+        #expect(r10)
+        let result = state.beginEditing(a)
+        #expect(!r11)
     }
 
     @Test func removedRowsLoseTheirState() {
@@ -57,13 +68,16 @@ struct BoardStateTests {
         var state = BoardState()
         state.requestHighlight([a, b])
         // observe 先只发来 a
-        #expect(state.reconcile(existing: [a, c]) == [a])
+        let result = state.reconcile(existing: [a, c])
+        #expect(r12 == [a])
         #expect(state.highlightedIDs == [a])
         // 之后 b 也到了
-        #expect(state.reconcile(existing: [a, b, c]) == [b])
+        let result = state.reconcile(existing: [a, b, c])
+        #expect(r13 == [b])
         #expect(state.highlightedIDs == [a, b])
         // 再刷新不重复开始
-        #expect(state.reconcile(existing: [a, b, c]).isEmpty)
+        let result = state.reconcile(existing: [a, b, c])
+        #expect(r14.isEmpty)
     }
 
     @Test func highlightExpires() {
@@ -73,7 +87,8 @@ struct BoardStateTests {
         state.expireHighlight(started)
         #expect(state.highlightedIDs.isEmpty)
         // 过期后刷新不会再次高亮
-        #expect(state.reconcile(existing: [a]).isEmpty)
+        let result = state.reconcile(existing: [a])
+        #expect(r15.isEmpty)
     }
 
     @Test func newRequestReplacesOldOne() {
@@ -82,7 +97,8 @@ struct BoardStateTests {
         state.reconcile(existing: [a, b])
         state.requestHighlight([b])
         #expect(state.highlightedIDs.isEmpty)
-        #expect(state.reconcile(existing: [a, b]) == [b])
+        let result = state.reconcile(existing: [a, b])
+        #expect(r16 == [b])
         #expect(state.highlightedIDs == [b])
     }
 
