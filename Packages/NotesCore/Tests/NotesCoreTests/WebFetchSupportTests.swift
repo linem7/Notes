@@ -354,12 +354,12 @@ struct WebFetchSupportTests {
 
     @Test(.timeLimit(.minutes(1)))
     func timeQueuedBehindAnotherFetchDoesNotCountTowardsTheTimeout() async throws {
-        // 1 个位置，时限 300 ms。第一个抓取占着位置（门关着），第二个排队超过 700 ms，也就是远超时限，
-        // 然后第一个放行、第二个立刻跑完：排队的时间不算，所以第二个不能超时
+        // 1 个位置，时限 300 ms。占位置的任务直接走限流器（不受抓取时限约束），第二个抓取排队超过 700 ms，
+        // 也就是远超时限，然后放行、第二个立刻跑完：排队的时间不算，所以第二个不能超时
         let runner = FetchRunner(limit: 1, timeout: .milliseconds(300))
         let gate = Gate()
         let started = Flag()
-        let first = Task { try await runner.run { await started.set(); await gate.wait(); return 1 } }
+        let first = Task { try await runner.limiter.withPermit { await started.set(); await gate.wait(); return 1 } }
         try await waitUntil { await started.isSet }
         let second = Task { try await runner.run { 2 } }
         try await waitUntil { await runner.limiter.waitingCount == 1 }
