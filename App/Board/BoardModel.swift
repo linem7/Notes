@@ -16,7 +16,9 @@ final class BoardModel {
     private(set) var showsSaveError = false
 
     var calendar: Calendar
-    let store: any NoteStoring
+    private(set) var store: (any NoteStoring)?
+    /// 数据库打不开的原因（SPEC §2.2）。非 nil 时 Board 不显示列表，显示纠错态，等用户 Retry。
+    private(set) var openFailure: String?
     let files: MaterialFiles
 
     @ObservationIgnored private var notes: [NoteWithMaterials] = []
@@ -31,11 +33,12 @@ final class BoardModel {
     @ObservationIgnored private let logger = Logger(subsystem: "com.linem7.Notes", category: "Board")
 
     init(
-        store: any NoteStoring, files: MaterialFiles,
+        store: (any NoteStoring)?, files: MaterialFiles, openFailure: String? = nil,
         calendar: Calendar = .autoupdatingCurrent, now: Date = Date(), highlightDuration: Duration = .seconds(3),
         errorDuration: Duration = .seconds(4)
     ) {
         self.store = store
+        self.openFailure = openFailure
         self.files = files
         self.calendar = calendar
         self.now = now
@@ -44,7 +47,7 @@ final class BoardModel {
     }
 
     func start() {
-        guard observeTask == nil else { return }
+        guard observeTask == nil, let store else { return }
         let stream = store.observe()
         observeTask = Task { [weak self] in
             for await items in stream {
@@ -58,6 +61,16 @@ final class BoardModel {
         observeTask?.cancel()
         observeTask = nil
     }
+
+    /// Retry 成功：接上 store，开始订阅（只在没有 store 时可能被调用）。
+    func attach(store: any NoteStoring) {
+        self.store = store
+        openFailure = nil
+        start()
+    }
+
+    /// Retry 又失败：换掉显示的原因。
+    func setOpenFailure(_ reason: String) { openFailure = reason }
 
     /// 跨过午夜或系统唤醒后调用：重新判断「今天」并重新分组。
     func refreshToday(_ date: Date = Date()) {
@@ -193,7 +206,7 @@ final class BoardModel {
         onSuccess: @escaping @MainActor () -> Void = {},
         onFailure: @escaping @MainActor () -> Void = {}
     ) {
-        let store = store
+        guard let store else { return }
         writeQueue.enqueue({ try await work(store) }) { [weak self] error in
             await self?.writeFinished(name, error: error, onSuccess: onSuccess, onFailure: onFailure)
         }
