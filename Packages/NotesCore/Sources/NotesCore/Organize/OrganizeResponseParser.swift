@@ -23,18 +23,49 @@ public enum OrganizeResponseParser {
 
     // MARK: 解析
 
-    /// 第一个 `{` 到最后一个 `}` 之间的 JSON（顺带去掉 ```json 围栏和前后的闲话）里的 `notes` 数组。
+    /// 从模型输出里取出条目，按顺序试，前一步取不到才试下一步：
+    /// 1. 去掉 ``` 围栏行后整体当 JSON：`{"notes": […]}`、裸数组 `[{…}, …]`、不带外壳的单个对象 `{"title": …}`；
+    /// 2. 第一个 `{` 到最后一个 `}` 之间（前后有闲话）；
+    /// 3. 第一个 `[` 到最后一个 `]` 之间（前后有闲话，条目是裸数组）。
+    /// 闲话里自己带了大括号 / 方括号的，这些步骤都会失败，走 fallback。
     private static func notes(in raw: String) -> [[String: Any]]? {
-        guard let start = raw.firstIndex(of: "{"), let end = raw.lastIndex(of: "}"), start < end,
-              let object = try? JSONSerialization.jsonObject(with: Data(raw[start...end].utf8)) as? [String: Any],
-              let notes = object["notes"] as? [Any] else { return nil }
-        return notes.compactMap { $0 as? [String: Any] }
+        let text = stripFences(raw)
+        let candidates: [Any?] = [
+            try? JSONSerialization.jsonObject(with: Data(text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)),
+            json(in: text, from: "{", to: "}"),
+            json(in: text, from: "[", to: "]"),
+        ]
+        for case let candidate? in candidates {
+            if let notes = notes(from: candidate) { return notes }
+        }
+        return nil
+    }
+
+    private static func notes(from json: Any) -> [[String: Any]]? {
+        if let object = json as? [String: Any] {
+            if let notes = object["notes"] as? [Any] { return notes.compactMap { $0 as? [String: Any] } }
+            return object["title"] != nil ? [object] : nil
+        }
+        if let array = json as? [Any] {
+            let objects = array.compactMap { $0 as? [String: Any] }
+            return objects.isEmpty ? nil : objects
+        }
+        return nil
+    }
+
+    private static func stripFences(_ raw: String) -> String {
+        raw.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("```") }
+            .joined(separator: "\n")
+    }
+
+    private static func json(in raw: String, from open: Character, to close: Character) -> Any? {
+        guard let start = raw.firstIndex(of: open), let end = raw.lastIndex(of: close), start < end else { return nil }
+        return try? JSONSerialization.jsonObject(with: Data(raw[start...end].utf8))
     }
 
     private static func draft(from note: [String: Any], allMaterials: [Int]) -> Draft? {
-        guard let title = (note["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
-            return nil
-        }
+        guard let title = singleLine(note["title"] as? String), !title.isEmpty else { return nil }
         var due: DueDate?
         if let day = validDay(note["due"]) {
             due = DueDate(day: day, time: validTime(note["time"]))
@@ -43,36 +74,38 @@ public enum OrganizeResponseParser {
         return Draft(title: title, due: due, detail: detail, materialIndices: materialIndices(note["materials"], allMaterials: allMaterials))
     }
 
+    /// Title 是一句话：换行折成空格，连续空白合并成一个，首尾空白去掉。
+    private static func singleLine(_ text: String?) -> String? {
+        text?.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
     /// prompt 里的序号从 1 开始；换算成从 0 开始，丢掉越界的和重复的。没写、写了空数组、或者写的全是越界序号，都算全部。
     private static func materialIndices(_ value: Any?, allMaterials: [Int]) -> [Int] {
         guard let numbers = value as? [Any] else { return allMaterials }
         let indices = Set(numbers.compactMap { element -> Int? in
             // JSON 里的 true / false 在 Foundation 里也是 NSNumber，不能当序号 1 / 0。
             // CFBooleanGetTypeID 只在 Darwin 上有；NotesCore 只支持 macOS（Package.swift），CI 也只跑 macOS。
-            guard let number = element as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
-                  number.doubleValue == number.doubleValue.rounded() else { return nil }
-            return number.intValue - 1
-        }.filter { allMaterials.contains($0) })
+            guard let number = element as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+            // 先在 Double 上判断范围和整数，再转 Int：模型给出 -9223372036854775808、1e30 这类值时不能溢出
+            let value = number.doubleValue
+            guard value == value.rounded(), value >= 1, value <= Double(allMaterials.count) else { return nil }
+            return Int(value) - 1
+        })
         return indices.isEmpty ? allMaterials : indices.sorted()
     }
 
     /// `yyyy-MM-dd` 并且是真实存在的日期；否则 nil。
     private static func validDay(_ value: Any?) -> String? {
-        guard let text = (value as? String)?.trimmingCharacters(in: .whitespaces),
-              text.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
-        let parts = text.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
-        let calendar = Calendar(identifier: .gregorian)
-        let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
-        guard let date = calendar.date(from: components),
-              calendar.dateComponents([.year, .month, .day], from: date) == components else { return nil }
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              DueDate.isValidDay(text) else { return nil }
         return text
     }
 
     /// `HH:mm`（24 小时制）；否则 nil。
     private static func validTime(_ value: Any?) -> String? {
-        guard let text = (value as? String)?.trimmingCharacters(in: .whitespaces),
-              text.range(of: #"^([01]\d|2[0-3]):[0-5]\d$"#, options: .regularExpression) != nil else { return nil }
+        // 要去掉换行：正则的 `$` 会匹配末尾换行之前，"09:00\n" 否则会带着换行存进去
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              text.range(of: #"^([01][0-9]|2[0-3]):[0-5][0-9]$"#, options: .regularExpression) != nil else { return nil }
         return text
     }
 
