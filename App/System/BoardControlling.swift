@@ -11,7 +11,7 @@ protocol BoardControlling: AnyObject {
 }
 
 /// 菜单栏和设置页共用的 Board 入口。窗口在 app 启动完成后才创建，所以先于 `BoardController` 存在，之后再接上。
-/// Board Mode 存在 UserDefaults（和 `BoardController` 同一个 key），改它会同步给窗口。
+/// Board Mode 存在 UserDefaults（和 `BoardController` 同一个 key），改它会同步给窗口；Board 隐藏时改它会用新模式把 Board 显示出来。
 @MainActor
 @Observable
 final class BoardProxy {
@@ -23,7 +23,10 @@ final class BoardProxy {
     var mode: BoardMode {
         didSet {
             defaults.set(mode.rawValue, forKey: Self.modeKey)
-            controller?.mode = mode
+            guard let controller else { return }
+            controller.mode = mode
+            // 在菜单栏或设置里切换 Board Mode 时，Board 被隐藏就用新的模式把它显示出来（L2）
+            if !controller.isVisible { controller.show() }
         }
     }
 
