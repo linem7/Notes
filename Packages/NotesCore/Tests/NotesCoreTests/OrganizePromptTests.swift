@@ -14,9 +14,9 @@ struct OrganizePromptTests {
     @Test func dateFollowsTheTimeZone() {
         // 同一时刻在东京已经是下一天
         let late = Date(timeIntervalSince1970: 1_791_806_400 + 14 * 3600)
-        let utc = OrganizePrompt.system(now: late, timeZone: TimeZone(identifier: "UTC")!, prompt: "")
+        let utc = OrganizePrompt.system(now: late, timeZone: TimeZone(identifier: "Africa/Abidjan")!, prompt: "")
         let tokyo = OrganizePrompt.system(now: late, timeZone: TimeZone(identifier: "Asia/Tokyo")!, prompt: "")
-        #expect(utc.hasPrefix("Today is 2026-10-13 (Tuesday), time zone UTC."))
+        #expect(utc.hasPrefix("Today is 2026-10-13 (Tuesday), time zone Africa/Abidjan."))
         #expect(tokyo.hasPrefix("Today is 2026-10-13 (Tuesday), time zone Asia/Tokyo."))
         let earlier = OrganizePrompt.system(now: now.addingTimeInterval(-13 * 3600), timeZone: TimeZone(identifier: "Pacific/Honolulu")!, prompt: "")
         #expect(earlier.hasPrefix("Today is 2026-10-11 (Sunday), time zone Pacific/Honolulu."))
