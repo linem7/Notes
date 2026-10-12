@@ -99,7 +99,7 @@ public final class NoteStore: NoteStoring, Sendable {
         try await database.write { db in
             try db.execute(sql: "DELETE FROM note WHERE id = ?", arguments: [id.uuidString])
         }
-        try await collectGarbage()
+        await collectGarbage()
     }
 
     public func addMaterial(noteID: UUID, from sourceURL: URL, displayName: String?) async throws -> Material {
@@ -124,7 +124,7 @@ public final class NoteStore: NoteStoring, Sendable {
         try await database.write { db in
             try db.execute(sql: "DELETE FROM material WHERE id = ?", arguments: [id.uuidString])
         }
-        try await collectGarbage()
+        await collectGarbage()
     }
 
     public func referencedFileNames() async throws -> Set<String> {
@@ -139,9 +139,11 @@ public final class NoteStore: NoteStoring, Sendable {
         }
     }
 
-    /// 回收没人引用的文件。用真实时间判断宽限期（文件的修改时间是真实时间，和注入的 clock 无关）。
-    private func collectGarbage() async throws {
-        files.collectGarbage(referenced: try await referencedFileNames(), now: Date())
+    /// 回收没人引用的文件。这是删除提交之后的善后：读引用失败就算了，留给下一次回收，不能让已经成功的删除变成报错。
+    /// 用真实时间判断宽限期（文件的修改时间是真实时间，和注入的 clock 无关）。
+    private func collectGarbage() async {
+        guard let referenced = try? await referencedFileNames() else { return }
+        files.collectGarbage(referenced: referenced, now: Date())
     }
 
     @discardableResult
@@ -160,7 +162,7 @@ public final class NoteStore: NoteStoring, Sendable {
             try db.execute(sql: "DELETE FROM note WHERE \(condition)", arguments: arguments)
             return db.changesCount
         }
-        try await collectGarbage()
+        await collectGarbage()
         return count
     }
 }

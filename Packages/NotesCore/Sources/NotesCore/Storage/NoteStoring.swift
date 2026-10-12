@@ -5,7 +5,10 @@ public enum NoteStoreError: Error, Equatable, Sendable {
     case duplicateID(UUID)
 }
 
-/// Note 和 Material 的存储（ARCHITECTURE §3.2）。真实实现是 GRDB 的 `NoteStore`，
+/// Note 和 Material 的存储（ARCHITECTURE §3.2）。
+///
+/// 删除类操作（`delete`、`deleteMaterial`、`deleteExpiredDone`、`deleteAllDone`）提交之后会回收没人引用的文件，
+/// 这一步是尽力而为：回收失败不会让删除报错，没回收掉的文件留给下一次（启动或 24 小时清理）。真实实现是 GRDB 的 `NoteStore`，
 /// `InMemoryNoteStore` 用于预览和测试。
 public protocol NoteStoring: Sendable {
     /// 所有 Material 行引用的文件名（storedFile / textFile / snapshotFile 的并集），给 `collectGarbage` 用。

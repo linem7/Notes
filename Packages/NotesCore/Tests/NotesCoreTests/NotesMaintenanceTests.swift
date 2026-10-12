@@ -23,12 +23,25 @@ struct NotesMaintenanceTests {
         let report = await NotesMaintenance(store: f.store, files: f.files).run(now: now)
 
         #expect(report.expiredNotesDeleted == 1)
-        #expect(report.garbageFilesDeleted == 1)
+        // 过期删除时 store 已经回收过一次，所以这里不断言 garbageFilesDeleted 的个数
         #expect(report.stagingDirectoriesDeleted == 1)
         #expect(report.failedSteps.isEmpty)
         #expect(f.fileNames() == [try #require(kept.storedFile)])
         #expect(!f.fileNames().contains(stray))
         #expect(!FileManager.default.fileExists(atPath: session.directory.path))
+    }
+
+    @Test(arguments: StoreKind.allCases)
+    func maintenanceCollectsFilesLeftByACrashedSave(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let live = note("live")
+        try await f.store.insert(notes: [live], materials: [])
+        let kept = try await f.store.addMaterial(noteID: live.id, from: try f.sourceFile())
+        _ = try f.files.writeSourceText("写了文件但没来得及插记录")
+        try f.ageAllFiles()
+        let report = await NotesMaintenance(store: f.store, files: f.files).run()
+        #expect(report.garbageFilesDeleted == 1)
+        #expect(f.fileNames() == [try #require(kept.storedFile)])
     }
 
     @Test(arguments: StoreKind.allCases)

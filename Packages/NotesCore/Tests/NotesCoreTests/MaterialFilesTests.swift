@@ -149,6 +149,19 @@ struct MaterialFilesTests {
         #expect(files.collectGarbage(referenced: []).removed == 0)
     }
 
+    @Test func importedBundlesGetTheirTopLevelModificationDateReset() throws {
+        let files = try makeFiles()
+        let bundle = files.root.appendingPathComponent("Old.pages", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: bundle.appendingPathComponent("index.xml"))
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000)], ofItemAtPath: bundle.path)
+        let name = try files.importFile(from: bundle)
+        let modified = try #require(try files.filesDirectory.appendingPathComponent(name)
+            .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        #expect(abs(modified.timeIntervalSinceNow) < 60)
+        #expect(files.collectGarbage(referenced: []).removed == 0)
+    }
+
     @Test func collectGarbageWithNoFilesDirectoryIsANoOp() throws {
         let files = try makeFiles()
         #expect(files.collectGarbage(referenced: []) == MaterialFiles.GarbageReport())

@@ -377,6 +377,24 @@ struct NoteStoringContractTests {
         #expect(f.fileNames() == [inFlight])
     }
 
+    @Test(arguments: StoreKind.allCases)
+    func deletesSucceedEvenWhenGarbageCollectionCannotRun(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        let a = note("a", done: Date(timeIntervalSinceReferenceDate: 1)), b = note("b"), c = note("c")
+        let m = Material(noteID: b.id, kind: .source, displayName: "Source", storedFile: "s.txt")
+        try await f.store.insert(notes: [a, b, c], materials: [m])
+        // files 不是目录：回收列不出内容。删除是善后失败不能连累的
+        try FileManager.default.createDirectory(at: f.files.materialsDirectory, withIntermediateDirectories: true)
+        try Data("not a directory".utf8).write(to: f.files.filesDirectory)
+
+        try await f.store.deleteMaterial(id: m.id)
+        try await f.store.delete(id: c.id)
+        #expect(try await f.store.deleteAllDone() == 1)
+        #expect(try await f.store.deleteExpiredDone(now: Date()) == 0)
+        #expect(try await f.store.allNotes().map(\.note.id) == [b.id])
+        #expect(try await f.store.allNotes().first?.materials.isEmpty == true)
+    }
+
     // MARK: observe
 
     @Test(arguments: StoreKind.allCases)
