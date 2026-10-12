@@ -4,7 +4,7 @@ import SwiftUI
 /// Material 的一个小条（SPEC §2.3）：File 点击打开副本；Web Page 点击打开 URL，旁边有快照和正文按钮；
 /// Source 点击在行内展开原文。可以删除时右侧有 ×（编辑中）。
 struct MaterialChip: View {
-    let material: Material
+    let material: NotesCore.Material
     let files: MaterialFiles
     let opener: any URLOpening
     var onDelete: (() -> Void)?
