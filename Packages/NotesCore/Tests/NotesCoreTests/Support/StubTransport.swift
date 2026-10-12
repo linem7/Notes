@@ -72,7 +72,7 @@ final class HangingTransport: HTTPTransport {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         let body = AsyncThrowingStream<UInt8, any Error> { continuation in
             state.withLock { $0.open = true }
-            continuation.onTermination = { [state] _ in state.withLock { $0.cancelled = true } }
+            continuation.onTermination = { [self] _ in state.withLock { $0.cancelled = true } }
         }
         return HTTPResponse(statusCode: 200, headers: [:], body: body)
     }
