@@ -22,7 +22,7 @@ struct SerialWriteQueueTests {
         }
     }
 
-    @Test func runsInOrderAndReportsSuccess() async throws {
+    @Test(.timeLimit(.minutes(1))) func runsInOrderAndReportsSuccess() async throws {
         let queue = SerialWriteQueue(timeout: .seconds(5))
         let log = Log()
         let (stream, done) = AsyncStream.makeStream(of: Void.self)
@@ -40,7 +40,7 @@ struct SerialWriteQueueTests {
         #expect(await log.items == ["run 1", "done 1 true", "run 2", "done 2 true", "run 3", "done 3 true"])
     }
 
-    @Test func failureIsReportedAndLaterWritesStillRun() async throws {
+    @Test(.timeLimit(.minutes(1))) func failureIsReportedAndLaterWritesStillRun() async throws {
         let queue = SerialWriteQueue(timeout: .seconds(5))
         let log = Log()
         let (stream, done) = AsyncStream.makeStream(of: Void.self)
@@ -57,7 +57,7 @@ struct SerialWriteQueueTests {
     }
 
     /// 一个永不返回、也不理会取消的写入（比如数据库被锁住）：超时后按失败处理，后面的写入照常执行。
-    @Test func hungWriteTimesOutAndLaterWritesStillRun() async throws {
+    @Test(.timeLimit(.minutes(1))) func hungWriteTimesOutAndLaterWritesStillRun() async throws {
         let queue = SerialWriteQueue(timeout: .milliseconds(100))
         let log = Log()
         let (stream, done) = AsyncStream.makeStream(of: Void.self)
