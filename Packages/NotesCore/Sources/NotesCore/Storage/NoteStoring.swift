@@ -15,10 +15,12 @@ public protocol NoteStoring: Sendable {
     /// 只保留最新值：来不及消费的中间状态会被丢掉。
     func observe() -> AsyncStream<[NoteWithMaterials]>
 
-    /// 一个事务插入。id 已存在时抛 `duplicateID`。
+    /// 一个事务插入。id 已存在（包括 `notes` 或 `materials` 里重复）抛 `duplicateID`；
+    /// Material 的 `noteID` 既不在已有 Note 里也不在 `notes` 里时抛 `noteNotFound`。出错时什么都不写。
     func insert(notes: [Note], materials: [Material]) async throws
 
-    /// 保存修改，`updatedAt` 由 store 设置。Note 不存在时抛 `noteNotFound`。
+    /// 保存 title、due、detail，`updatedAt` 由 store 设置。**不写 `doneAt`**：完成状态只通过 `setDone` 改，
+    /// 这样界面上过时的 Note 副本不会把刚完成的 Note 改回未完成。Note 不存在时抛 `noteNotFound`。
     func update(_ note: Note) async throws
 
     /// `at` 为 nil 表示取消完成。不改 `updatedAt`。Note 不存在时抛 `noteNotFound`。

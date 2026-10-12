@@ -95,7 +95,7 @@ material(id TEXT PK, noteID → note ON DELETE CASCADE, kind, displayName, store
 ```
 
 - 时间列存 `timeIntervalSinceReferenceDate`（同 Chatbot）。
-- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`、`setDone(id, at:)`、`delete(id)`、`addMaterial`、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`。
+- `NoteStore` 提供：`allNotes()`、`observe()`（GRDB `ValueObservation`，Board 订阅）、`insert(notes:materials:)`（一个事务）、`update(note)`（只写 title / due / detail，完成状态只经 `setDone`）、`setDone(id, at:)`、`delete(id)`、`addMaterial(noteID:from:)`（复制文件并插入 File 记录）、`addMaterial(_ material:)`（文件已在 Note 目录里的记录，Source 和 Web Page 用）、`deleteMaterial`、`deleteExpiredDone(now:)`、`deleteAllDone()`。
 - 删除 Note 时先删记录再删 `materials/<noteID>/` 目录；`MaterialFiles` 负责目录的创建、复制、删除。启动时清理一次没有对应记录的孤儿目录。
 - 没有全文搜索（v1 不做搜索）。
 
@@ -207,7 +207,7 @@ Readable Text……
 - **API key**：Keychain service `com.linem7.Notes.apikey`，account 为 Connection ID（移植 `APIKeyStore`）。
 - **开机启动**：`SMAppService.mainApp`（移植）。
 - **普通窗口**（设置）：移植 `RegularWindows`，打开时 `.regular`，关掉后 `.accessory`。
-- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和孤儿目录。
+- **清理**：启动时和每 24 小时调用 `NoteStore.deleteExpiredDone(now:)`（完成 30 天以上），以及清 staging 和孤儿目录（没有对应记录的 `materials/<uuid>/`）。孤儿目录有 10 分钟宽限期（按目录修改时间）：保存 Note 时先写文件再插记录，启动时的清理不能把刚崩溃前写下的目录当孤儿误删。
 
 ## 10. 需要真机核实的事
 
