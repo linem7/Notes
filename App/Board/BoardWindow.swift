@@ -104,12 +104,23 @@ final class BoardWindow: NSPanel {
 
 /// 顶栏的拖动区：按下后交给窗口的 `performDrag`，同 Chatbot 的做法。
 struct WindowDragArea: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { DragView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    /// 按下顶栏时通知（用来保存正在编辑的 Note）。
+    var onMouseDown: () -> Void = {}
+
+    func makeNSView(context: Context) -> NSView {
+        let view = DragView()
+        view.onMouseDown = onMouseDown
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? DragView)?.onMouseDown = onMouseDown
+    }
 
     private final class DragView: NSView {
+        var onMouseDown: () -> Void = {}
         override var mouseDownCanMoveWindow: Bool { false }
         override func mouseDown(with event: NSEvent) {
+            onMouseDown()
             window?.performDrag(with: event)
         }
     }

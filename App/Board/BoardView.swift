@@ -41,7 +41,7 @@ struct BoardView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(WindowDragArea())
+        .background(WindowDragArea(onMouseDown: { model.commitEditing() }))
     }
 
     private var saveErrorBar: some View {
@@ -84,7 +84,8 @@ struct BoardView: View {
                 .padding(.horizontal, 8)
                 .padding(.bottom, 12)
             }
-            .onTapGesture { model.commitEditing() }  // 点列表空白处：保存正在编辑的
+            // 点列表空白处：保存正在编辑的。放在背景层，行和按钮自己的点击不受影响
+            .background(Color.clear.contentShape(Rectangle()).onTapGesture { model.commitEditing() })
             .focusable()
             .focused($listFocused)
             .focusEffectDisabled()
@@ -105,6 +106,7 @@ struct BoardView: View {
         let title = Self.title(for: content.section)
         if content.section == .done {
             Button {
+                model.commitEditing()
                 model.setDoneExpanded(!model.state.isDoneExpanded)
             } label: {
                 HStack(spacing: 4) {
@@ -120,6 +122,8 @@ struct BoardView: View {
             .sectionHeaderStyle()
         } else {
             Text(title).sectionHeaderStyle()
+                .contentShape(Rectangle())
+                .onTapGesture { model.commitEditing() }
         }
     }
 

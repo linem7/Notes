@@ -27,6 +27,9 @@ struct NoteRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(background, in: RoundedRectangle(cornerRadius: 10))
+        // 编辑中，行内的空白处不算「点别处」
+        .contentShape(Rectangle())
+        .onTapGesture {}
         .animation(.easeOut(duration: 0.6), value: isHighlighted)
         .contextMenu {
             Button("Delete", role: .destructive) { model.delete(note.id) }
