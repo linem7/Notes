@@ -39,7 +39,7 @@ App/                          # app target「Notes」
 Packages/NotesCore/           # 本地 SPM 包，不依赖 SwiftUI/AppKit/WebKit
   Sources/NotesCore/
     Domain/                   # Note、DueDate、Material、MaterialKind、Draft、Connection、Platform、ModelInfo、ChatError、JSONValue
-    LLM/                      # SSEParser、HTTPTransport、OpenAICompatibleClient（移植并精简）、BailianModelTable（移植）
+    LLM/                      # SSEParser、HTTPTransport、OpenAICompatibleClient（移植并精简）
     Organize/                 # Organizer、OrganizePrompt、OrganizeResponseParser、MaterialBudget
     Intake/                   # MaterialIntake、PDFTextExtractor（移植）、TextDecoder、ImageOCR、LinkDetector
     Storage/                  # NoteStore（GRDB）、MaterialFiles、Cleanup
