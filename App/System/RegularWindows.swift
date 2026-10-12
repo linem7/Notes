@@ -6,7 +6,7 @@ import SwiftUI
 ///   `hidesOnDeactivate` 为 true，用户点别的 app 时 AppKit 会把它们藏起来。
 /// - 开着时临时出现在 Dock 和 ⌘Tab 里（激活策略 `.regular`），被别的窗口盖住也能切回来；
 ///   全部关掉后恢复成只在菜单栏（`.accessory`），并把前台还给打开窗口之前的 app。
-///   不用 `NSApp.hide(nil)`：app 进入 hidden 状态后，不激活 app 的 Quick Panel 就出不来了。
+///   不用 `NSApp.hide(nil)`：app 进入 hidden 状态后，不激活 app 的 Quick Add 面板就出不来了。
 ///
 /// Quick Add 和 Board 不经过这里：它们是不激活 app 的面板，也不让 Dock 出现图标。
 @MainActor
