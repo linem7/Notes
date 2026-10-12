@@ -320,6 +320,8 @@ public final class QuickAddStore {
                 return false
             }
             let first = await group.next() ?? false
+            // 到点了：真的取消还在跑的 prepare。不取消的话，等它们的那个子任务不会结束，withTaskGroup 也就不会返回
+            if !first, !Task.isCancelled { for task in tasks { task.cancel() } }
             group.cancelAll()
             return first
         }
