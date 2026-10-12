@@ -17,7 +17,7 @@
 1. 打开 [v0.1.0 Release](https://github.com/linem7/Notes/releases/tag/v0.1.0)，在 **Assets** 下载 `Notes-0.1.0-macOS-arm64.zip`。**Source code** 是开发者用的源码，不是安装包。
 2. 双击 ZIP 解压，将 `Notes.app` 拖进 **Applications**。
 3. 从 **Applications** 打开 Notes。
-4. 应用使用自签名证书，没有经过 Apple 公证。如果首次打开提示 Apple 无法验证开发者或检查应用，在确认文件来自上述 Release 后，进入 **System Settings › Privacy & Security**，向下滚动，点击 **Open Anyway**，然后按提示确认 **Open**。需要先尝试打开一次，系统才会显示该入口。详见 [Apple 的打开说明](https://support.apple.com/en-us/102445)。
+4. 应用使用自签名证书，没有经过 Apple 公证。如果首次打开提示 Apple 无法验证开发者或检查应用，在确认文件来自上述 Release 后，进入 **System Settings › Privacy & Security**，向下滚动，点击 **Open Anyway**，然后按提示确认 **Open**。需要先尝试打开一次，系统才会显示该入口（TODO：真机核实这整套流程和文案）。详见 [Apple 的打开说明](https://support.apple.com/en-us/102445)。
 
 无需安装 Xcode、运行终端命令或导入开发者的签名证书。
 
@@ -45,7 +45,7 @@ Notes 不发系统通知、不接日历、不做提醒。
 | Quick Add | Esc | 隐藏面板（Organize 进行中时先取消） |
 | Board（Note 编辑） | ⌘⏎ / Esc | 保存 / 放弃修改；点 Board 别处或切到别的 app（失焦）也会保存 |
 | Board（点击选中 Note，未在编辑文字） | ⌫ | 删除 Note，不弹确认；只是展开不算选中，编辑文字时 ⌫ 只删字 |
-| 菜单栏菜单打开时 | ⌘, | 打开 Settings。这个组合挂在菜单栏菜单的 **Settings…** 项上，Notes 平时不在前台，菜单没打开时不起作用（TODO：真机核实） |
+| 菜单栏菜单的 **Settings…** 项 | ⌘, | 打开 Settings。快捷键挂在菜单栏菜单的这一项上；app 处于活动状态（例如设置窗口开着）时 ⌘, 是否也响应，TODO：真机核实 |
 
 - 默认 **Option + N** 不需要 Accessibility 或 Screen Recording 权限。在美式键盘上 option+N 原本用来输入 ñ，注册后这个组合不再打字；如果和其他应用冲突，在 **Settings › General › Hotkey** 换一个组合。启动和改键时会检测与系统快捷键的冲突。
 - TODO（#7 / #10 落地后核实）：各项权限提示，例如网页抓取、OCR 是否会触发任何系统授权弹窗；目前 SPEC 预期无需额外权限。
