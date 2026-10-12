@@ -11,7 +11,7 @@ public struct MaterialActions: Equatable, Sendable {
     /// 点击条目是展开而不是打开（Source）。
     public var primaryTogglesInlineText: Bool
 
-    public init(material: Material, files: any MaterialFileResolving) {
+    public init(material: Material, files: MaterialFiles) {
         switch material.kind {
         case .file:
             primary = files.url(for: material, role: .stored)

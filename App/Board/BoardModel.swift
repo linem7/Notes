@@ -7,14 +7,15 @@ import os
 @MainActor
 @Observable
 final class BoardModel {
-    private(set) var sections: BoardSections
+    private(set) var sections: [BoardSectionContent] = []
+    private(set) var badgeCount = 0
     private(set) var state = BoardState()
     private(set) var now: Date
     private(set) var hasLoaded = false
 
     var calendar: Calendar
     let store: any NoteStoring
-    let files: any MaterialFileResolving
+    let files: MaterialFiles
 
     @ObservationIgnored private var notes: [NoteWithMaterials] = []
     @ObservationIgnored private var observeTask: Task<Void, Never>?
@@ -22,7 +23,7 @@ final class BoardModel {
     @ObservationIgnored private let logger = Logger(subsystem: "com.linem7.Notes", category: "Board")
 
     init(
-        store: any NoteStoring, files: any MaterialFileResolving,
+        store: any NoteStoring, files: MaterialFiles,
         calendar: Calendar = .current, now: Date = Date(), highlightDuration: Duration = .seconds(3)
     ) {
         self.store = store
@@ -30,7 +31,6 @@ final class BoardModel {
         self.calendar = calendar
         self.now = now
         self.highlightDuration = highlightDuration
-        sections = BoardSections(notes: [], today: now, calendar: calendar)
     }
 
     func start() {
@@ -69,7 +69,8 @@ final class BoardModel {
     }
 
     private func regroup() {
-        sections = BoardSections(notes: notes, today: now, calendar: calendar)
+        sections = BoardSections.sections(for: notes, today: now, calendar: calendar)
+        badgeCount = BoardSections.badgeCount(for: notes, today: now, calendar: calendar)
     }
 
     // MARK: 交互状态
@@ -88,8 +89,14 @@ final class BoardModel {
 
     // MARK: 写入（失败只记日志；observe 会重发真实状态，界面随之回滚）
 
-    func save(_ note: Note) {
-        run("update") { try await $0.update(note) }
+    /// 保存编辑：只改 title、due、detail（完成状态只能走 `setDone`），基于 store 最近一次发来的 Note。
+    func save(id: UUID, title: String, due: DueDate?, detail: String) {
+        guard var note = notes.first(where: { $0.id == id })?.note else { return }
+        note.title = title
+        note.due = due
+        note.detail = detail
+        let updated = note
+        run("update") { try await $0.update(updated) }
         state.endEditing()
     }
 
@@ -110,7 +117,7 @@ final class BoardModel {
 
     func addFiles(_ urls: [URL], to noteID: UUID) {
         for url in urls where url.isFileURL {
-            run("addMaterial") { _ = try await $0.addMaterial(noteID: noteID, from: url) }
+            run("addMaterial") { _ = try await $0.addMaterial(noteID: noteID, from: url, displayName: nil) }
         }
     }
 
