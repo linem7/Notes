@@ -82,5 +82,10 @@ struct DueDateTextTests {
         #expect(display("tomorrow") == nil)
         #expect(display("2026-10") == nil)
         #expect(display("") == nil)
+        // 格式对但不是真实日期：不能被换算成别的日子（2026-02-30 → 3 月 2 日）
+        #expect(display("2026-02-30") == nil)
+        #expect(display("2026-13-01") == nil)
+        #expect(display("2026-00-10") == nil)
+        #expect(display("2026-10-32") == nil)
     }
 }
