@@ -29,4 +29,9 @@ struct LinkDetectorTests {
         #expect(LinkDetector.links(in: "").isEmpty)
         #expect(LinkDetector.links(in: "没有链接").isEmpty)
     }
+
+    @Test func chinesePunctuationIsNotPartOfTheLink() {
+        #expect(LinkDetector.links(in: "合同在 https://example.com/a。明天看").map(\.absoluteString) == ["https://example.com/a"])
+        #expect(LinkDetector.links(in: "（详见 https://example.com/a）").map(\.absoluteString) == ["https://example.com/a"])
+    }
 }

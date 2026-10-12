@@ -190,6 +190,7 @@ struct MaterialIntakeTests {
 #if canImport(PDFKit)
 /// 只在 Apple 平台上跑（CI）。Fixtures/text.pdf 和 Fixtures/scanned.pdf 是手写的最小 PDF：
 /// 前者有一行文字 "Hello PDF"，后者是一个空白页，模拟扫描版。
+@Suite(.timeLimit(.minutes(1)))
 struct PDFIntakeTests {
     private func fixtureURL(_ name: String) throws -> URL {
         try #require(Bundle.module.url(forResource: name, withExtension: nil, subdirectory: "Fixtures"))

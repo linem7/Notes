@@ -48,4 +48,14 @@ struct MaterialBudgetTests {
         let result = MaterialBudget.default.apply(source: text(20_000), materialTexts: Array(repeating: text(20_000), count: 3))
         #expect(result.source == text(20_000))
     }
+
+    @Test func oneOverTheTotalCutsExactlyOneCharacterFromTheLastMaterial() {
+        let result = MaterialBudget.default.apply(source: "", materialTexts: [text(20_000), text(20_000), text(20_001)])
+        #expect(result.materials == [text(20_000), text(20_000), text(20_000) + marker])
+        // 第三个本身没超过单个上限的话，就是总量把它切掉 1 个字符
+        let third = MaterialBudget(perMaterial: 30_000, total: 60_000, source: 20_000)
+            .apply(source: "", materialTexts: [text(20_000), text(20_000), text(20_001)])
+        #expect(third.materials == [text(20_000), text(20_000), text(20_000) + marker])
+        #expect(third.materials[2]?.count == 20_000 + marker.count)
+    }
 }

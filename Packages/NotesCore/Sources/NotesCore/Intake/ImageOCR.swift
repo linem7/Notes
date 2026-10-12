@@ -40,11 +40,11 @@ enum ImageOCR {
     }
 
     #if canImport(PDFKit)
-    /// 扫描版 PDF：逐页渲染后 OCR，最多 `maxPDFPages` 页。
-    static func recognizeText(inPDFAt url: URL) throws -> String {
+    /// 扫描版 PDF：逐页渲染后 OCR，最多 `maxPages` 页（默认 `maxPDFPages`，测试里传小数字）。
+    static func recognizeText(inPDFAt url: URL, maxPages: Int = maxPDFPages) throws -> String {
         guard let document = PDFDocument(url: url) else { throw PDFTextError.unreadable }
         var pages: [String] = []
-        for index in 0..<min(document.pageCount, maxPDFPages) {
+        for index in 0..<min(document.pageCount, maxPages) {
             if Task.isCancelled { break }
             guard let page = document.page(at: index), let image = render(page) else { continue }
             let text = try recognizeText(in: image).trimmingCharacters(in: .whitespacesAndNewlines)

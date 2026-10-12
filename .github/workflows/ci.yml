@@ -42,4 +42,5 @@ jobs:
             CODE_SIGN_IDENTITY=""
 
       - name: Test NotesCore
+        timeout-minutes: 15
         run: swift test --package-path Packages/NotesCore
