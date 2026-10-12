@@ -296,4 +296,14 @@ struct MaterialFilesTests {
         try setModified(session.directory, to: stamp)
         #expect(files.clearStaging(respectingGracePeriod: false, now: stamp).removed == 1)
     }
+
+    @Test func isPastGracePeriodKeepsUnknownAndExactlyTenMinutesOldAndDropsOlder() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(!MaterialFiles.isPastGracePeriod(modified: nil, now: now))
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now, now: now))
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(-600), now: now))
+        #expect(MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(-601), now: now))
+        // 修改时间在「现在」之后（时钟被调过）：当作新的
+        #expect(!MaterialFiles.isPastGracePeriod(modified: now.addingTimeInterval(60), now: now))
+    }
 }

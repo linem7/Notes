@@ -125,10 +125,7 @@ public struct MaterialFiles: Sendable {
             at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
         )) ?? []
         for url in urls where !referenced.contains(url.lastPathComponent) {
-            // 读不到修改时间就当作新的留着：删错了是丢用户的文件，留着只是晚一点回收
-            if let modified = modificationDate(of: url), now.timeIntervalSince(modified) > Self.garbageGracePeriod {
-                // 超过宽限期，往下删
-            } else {
+            guard Self.isPastGracePeriod(modified: modificationDate(of: url), now: now) else {
                 report.keptInGracePeriod += 1
                 continue
             }
@@ -184,9 +181,7 @@ public struct MaterialFiles: Sendable {
         for url in urls {
             if let id = UUID(uuidString: url.lastPathComponent), keeping.contains(id) { continue }
             // 带宽限期时：修改时间读不到也留着（和 collectGarbage 一样，宁可晚点清，不删用户的文件）
-            if respectingGracePeriod {
-                guard let modified = modificationDate(of: url), now.timeIntervalSince(modified) > Self.garbageGracePeriod else { continue }
-            }
+            if respectingGracePeriod, !Self.isPastGracePeriod(modified: modificationDate(of: url), now: now) { continue }
             do {
                 try FileManager.default.removeItem(at: url)
                 removed += 1
@@ -195,6 +190,13 @@ public struct MaterialFiles: Sendable {
             }
         }
         return (removed, failed)
+    }
+
+    /// 修改时间已经超过宽限期（可以回收 / 清理）。刚好 `garbageGracePeriod` 秒还算新；
+    /// 读不到修改时间（nil）当作新的：删错了是丢用户的文件，留着只是晚一点回收。
+    static func isPastGracePeriod(modified: Date?, now: Date) -> Bool {
+        guard let modified else { return false }
+        return now.timeIntervalSince(modified) > garbageGracePeriod
     }
 
     private func modificationDate(of url: URL) -> Date? {
