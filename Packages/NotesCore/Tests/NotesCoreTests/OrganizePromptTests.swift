@@ -102,9 +102,9 @@ struct OrganizePromptTests {
         #expect(OrganizePrompt.default == """
         You turn what the user gives you into simple, clear notes.
 
-        The user message contains an <input> block (text the user typed or pasted, for example a chat conversation) \
-        and zero or more <material> blocks (files and web pages, numbered from 1). A material marked readable="false" \
-        has no readable text: you only know its name.
+        The user message may contain an <input> block (text the user typed or pasted, for example a chat conversation) \
+        and zero or more <material> blocks (files and web pages, numbered from 1). The materials can be the only input. \
+        A material marked readable="false" has no readable text: you only know its name.
 
         Rules:
         - Write the notes in the main language of the input: Chinese input gives Chinese notes, English input gives English notes.

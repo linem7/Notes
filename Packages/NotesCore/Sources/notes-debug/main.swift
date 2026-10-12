@@ -1,15 +1,17 @@
 // 调试用的命令行：用真实的 key 跑一次 Organize，打印得到的 Draft。
 //
 // 用法（在 Mac 上，仓库根目录）：
-//   NOTES_API_KEY=sk-... swift run --package-path Packages/NotesCore notes-debug input.txt
+//   NOTES_API_KEY=sk-... swift run --package-path Packages/NotesCore notes-debug input.txt [material ...]
+//
+// input.txt 之后的参数是 Material：文件路径（走和 app 一样的 MaterialIntake：PDF、文本、图片 OCR），
+// 或者 http/https 链接（这里没有网页抓取器，链接只会以「读不到」的 Material 交给模型）。
+// 不想要文字输入时，input.txt 传空文件。
 //
 // 环境变量：
 //   NOTES_API_KEY   必填
 //   NOTES_BASE_URL  默认 https://api.deepseek.com
 //   NOTES_MODEL     默认 deepseek-flash
 //
-// 材料路径（文件）等 MaterialIntake（#5）合并后再加。
-
 import Foundation
 import NotesCore
 
@@ -20,7 +22,7 @@ func fail(_ message: String) -> Never {
 
 let environment = ProcessInfo.processInfo.environment
 let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 1 else { fail("usage: notes-debug <input-text-file>") }
+guard !arguments.isEmpty else { fail("usage: notes-debug <input-text-file> [material-file-or-url ...]") }
 guard let apiKey = environment["NOTES_API_KEY"], !apiKey.isEmpty else { fail("NOTES_API_KEY is not set") }
 guard let input = try? String(contentsOfFile: arguments[0], encoding: .utf8) else { fail("can't read \(arguments[0])") }
 
@@ -32,9 +34,28 @@ let modelID = environment["NOTES_MODEL"] ?? "deepseek-flash"
 let connection = Connection(name: "debug", baseURL: baseURL)
 
 do {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("notes-debug-\(UUID().uuidString)")
+    let files = MaterialFiles(root: root)
+    let session = try files.makeStagingSession()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let intake = MaterialIntake(files: files, session: session)
+
+    var materials: [OrganizeMaterial] = []
+    for argument in arguments.dropFirst() {
+        let staged: StagedMaterial
+        if let url = URL(string: argument), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            staged = intake.stage(url: url)
+        } else {
+            staged = try intake.stage(fileAt: URL(fileURLWithPath: argument))
+        }
+        let prepared = await intake.prepare(staged)
+        print("material \(materials.count + 1): \(staged.displayName) -> \(prepared.state)")
+        materials.append(OrganizeMaterial(staged: staged, prepared: prepared))
+    }
+
     let started = Date()
     let drafts = try await Organizer().organize(
-        input: input, promptMaterials: [], connection: connection, modelID: modelID, apiKey: apiKey
+        input: input, materials: materials, connection: connection, modelID: modelID, apiKey: apiKey
     )
     print("\(drafts.count) draft(s) in \(String(format: "%.1f", Date().timeIntervalSince(started))) s\n")
     for (offset, draft) in drafts.enumerated() {
