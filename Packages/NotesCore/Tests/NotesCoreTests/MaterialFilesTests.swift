@@ -209,7 +209,7 @@ struct MaterialFilesTests {
         _ = try files.makeStagingSession()
         let stray = files.stagingDirectory.appendingPathComponent("stray.txt")
         try Data("x".utf8).write(to: stray)
-        let result = files.clearStaging(keeping: [keep.id])
+        let result = files.clearStaging(keeping: [keep.id], respectingGracePeriod: false)
         #expect(result.removed == 2)    // 另一个会话目录 + 根目录里的零散文件
         #expect(result.failed == 0)
         #expect(!FileManager.default.fileExists(atPath: stray.path))
@@ -242,7 +242,7 @@ struct MaterialFilesTests {
         let files = try makeFiles()
         let fresh = try files.makeStagingSession()
         let kept = try files.makeStagingSession()
-        let result = files.clearStaging(keeping: [kept.id])
+        let result = files.clearStaging(keeping: [kept.id], respectingGracePeriod: false)
         #expect(result.removed == 1)
         #expect(!FileManager.default.fileExists(atPath: fresh.directory.path))
         #expect(FileManager.default.fileExists(atPath: kept.directory.path))

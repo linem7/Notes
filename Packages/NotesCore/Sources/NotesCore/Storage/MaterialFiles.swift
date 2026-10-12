@@ -168,13 +168,13 @@ public struct MaterialFiles: Sendable {
 
     /// 删掉 `staging/` 下除 `keeping` 以外的全部内容（会话目录和根目录里的零散文件），返回删掉和失败的个数。
     ///
-    /// `respectingGracePeriod` 为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟）之内的条目。
-    /// 24 小时清理用它：清理先读到「正在用的会话」、再来删，这中间用户可能粘贴了文件，Quick Add 新建了会话目录，
+    /// `respectingGracePeriod`（默认 true）为 true 时跳过修改时间在 `garbageGracePeriod`（10 分钟）之内的条目。
+    /// 默认选安全的一边：忘了传只会清得慢一点，不会删掉用户刚加的文件。24 小时清理用它：清理先读到「正在用的会话」、再来删，这中间用户可能粘贴了文件，Quick Add 新建了会话目录，
     /// 它不在 `keeping` 里，不能连同用户刚加的文件一起删掉。往会话目录里加文件或删文件都会更新目录的修改时间，
-    /// 所以在用的会话一直算「新」。启动时的清理传 false：这时不会有活跃的会话，全部清掉。
+    /// 所以在用的会话一直算「新」。只有启动时的清理显式传 false：这时不会有活跃的会话，全部清掉。
     @discardableResult
     func clearStaging(
-        keeping: Set<UUID> = [], respectingGracePeriod: Bool = false, now: Date = Date()
+        keeping: Set<UUID> = [], respectingGracePeriod: Bool = true, now: Date = Date()
     ) -> (removed: Int, failed: Int) {
         var removed = 0, failed = 0
         let urls = (try? FileManager.default.contentsOfDirectory(at: stagingDirectory, includingPropertiesForKeys: nil)) ?? []
