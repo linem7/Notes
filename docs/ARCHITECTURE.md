@@ -180,6 +180,7 @@ Readable Text……
 - 离屏 `WKWebView`（`WKWebsiteDataStore.nonPersistent()`，不带用户的 cookie），加载 URL，等 `didFinish` 后再等 1 秒给前端渲染，单个链接总超时 20 秒，最多同时抓 2 个。
 - 注入打包的 `Readability.js`，执行 `new Readability(document.cloneNode(true)).parse()`，取 `title` 和 `textContent`；失败或正文少于 200 字符时退回 `document.body.innerText`。
 - PDF 快照：`WKWebView.createPDF(configuration:)`，失败不影响正文。
+- 允许抓取 http:// 页面：Info.plist 设 `NSAppTransportSecurity.NSAllowsArbitraryLoadsInWebContent = YES`（只放开 WebView 内容，用户 2026-10-12 确认）。
 - 结果：`WebPageResult(title, text, pdfData?)`；整体失败时 Material 仍保存 URL，Readable Text 为 unavailable（原因：「Couldn't load the page」）。
 - 需要登录的页面（比如部分微信公众号文章）可能抓到登录页，v1 不处理，只靠「正文太短」退回 innerText。**需要真机核实微信公众号链接的效果。**
 - 在主线程使用 WebKit；对外是 `async` 接口，由 `QuickAddStore` 调用。NotesCore 里定义协议 `WebPageFetching`，App 注入实现，方便测试 Intake 流程。
