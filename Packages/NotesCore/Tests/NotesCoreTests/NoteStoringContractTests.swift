@@ -192,6 +192,22 @@ struct NoteStoringContractTests {
         #expect(stored.doneAt == nil)
     }
 
+    @Test(arguments: StoreKind.allCases)
+    func updateKeepsCreatedAtAndDoesNotCreateNotes(kind: StoreKind) async throws {
+        let f = try StoreFixture(kind)
+        var n = note("n", created: 10)
+        try await f.store.insert(notes: [n], materials: [])
+        n.createdAt = Date(timeIntervalSinceReferenceDate: 999)   // 传进来的 createdAt 不该被写入
+        n.title = "edited"
+        try await f.store.update(n)
+        let stored = try #require(try await f.store.allNotes().first?.note)
+        #expect(stored.createdAt == Date(timeIntervalSinceReferenceDate: 10))
+
+        let ghost = note("ghost")
+        await #expect(throws: NoteStoreError.noteNotFound(ghost.id)) { try await f.store.update(ghost) }
+        #expect(try await f.store.allNotes().map(\.note.title) == ["edited"])
+    }
+
     // MARK: 删除
 
     @Test(arguments: StoreKind.allCases)
@@ -438,6 +454,46 @@ struct NoteStoringContractTests {
         #expect(await received.value == before)
         #expect(try await f.store.allNotes().count == 2)
     }
+
+    @Test func inMemorySubscribersAreDroppedWhenTheyCancel() async throws {
+        let store = InMemoryNoteStore()
+        let received = Counter()
+        let stream = store.observe()
+        let consumer = Task { for await _ in stream { await received.increment() } }
+        try await received.waitUntilAtLeast(1)
+        #expect(await store.subscriberCount == 1)
+        consumer.cancel()
+        await consumer.value
+        try await waitUntil { await store.subscriberCount == 0 }
+    }
+
+    @Test func inMemoryObserverThatIsDroppedBeforeItSubscribedDoesNotLinger() async throws {
+        let store = InMemoryNoteStore()
+        for _ in 0..<50 { _ = store.observe() }   // 马上丢掉，订阅登记和取消回调谁先执行都不能留下条目
+        try await waitUntil { await store.subscriberCount == 0 }
+    }
+
+    @Test func grdbObservationEndsWhenTheSubscriberCancels() async throws {
+        let f = try StoreFixture(.grdb)
+        let store = try #require(f.store as? NoteStore)
+        let received = Counter()
+        let stream = store.observe()
+        #expect(store.activeObservations.withLock { $0 } == 1)
+        let consumer = Task { for await _ in stream { await received.increment() } }
+        try await received.waitUntilAtLeast(1)
+        consumer.cancel()
+        await consumer.value
+        try await waitUntil { store.activeObservations.withLock { $0 } == 0 }
+    }
+}
+
+/// 最多等 5 秒，条件成立就返回，否则记录失败。
+private func waitUntil(_ condition: () async -> Bool) async throws {
+    for _ in 0..<500 {
+        if await condition() { return }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    Issue.record("等待超时")
 }
 
 private actor Counter {
@@ -470,6 +526,33 @@ struct NoteStoreGRDBTests {
         #expect(after == 0)
         let foreignKeys = try await store.database.read { db in try Int.fetchOne(db, sql: "PRAGMA foreign_keys") }
         #expect(foreignKeys == 1)
+    }
+}
+
+struct NoteStoreCorruptionTests {
+    private func storeWithAnUnknownMaterialKind() async throws -> NoteStore {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("NoteStoreCorrupt-\(UUID().uuidString)")
+        let store = try NoteStore(directory: root)
+        let n = note("n")
+        try await store.insert(notes: [n], materials: [])
+        try await store.database.write { db in
+            try db.execute(
+                sql: "INSERT INTO material (id, noteID, kind, displayName, createdAt) VALUES (?, ?, 'hologram', 'x', 0)",
+                arguments: [UUID().uuidString, n.id.uuidString]
+            )
+        }
+        return store
+    }
+
+    @Test func anUnknownMaterialKindThrowsInsteadOfCrashing() async throws {
+        let store = try await storeWithAnUnknownMaterialKind()
+        await #expect(throws: StorageError.self) { try await store.allNotes() }
+    }
+
+    @Test func observeEndsTheStreamWhenTheDatabaseCannotBeRead() async throws {
+        let store = try await storeWithAnUnknownMaterialKind()
+        var iterator = store.observe().makeAsyncIterator()
+        #expect(await iterator.next() == nil)
     }
 }
 

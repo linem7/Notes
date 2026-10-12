@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import Synchronization
 
 /// 本地存储（ARCHITECTURE §3.2）：GRDB 数据库加 `materials/` 目录。
 ///
@@ -10,6 +11,8 @@ public final class NoteStore: NoteStoring, Sendable {
     let database: DatabasePool
     private let files: MaterialFiles
     private let clock: @Sendable () -> Date
+    /// 还在运行的 `observe()` 任务个数。测试用，确认订阅方取消后底层观察确实结束。
+    let activeObservations = Mutex<Int>(0)
 
     public init(directory: URL, clock: @escaping @Sendable () -> Date = { Date() }) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -36,7 +39,9 @@ public final class NoteStore: NoteStoring, Sendable {
             of: [NoteWithMaterials].self, bufferingPolicy: .bufferingNewest(1)
         )
         let database = database
+        activeObservations.withLock { $0 += 1 }
         let task = Task {
+            defer { self.activeObservations.withLock { $0 -= 1 } }
             do {
                 for try await value in observation.values(in: database, bufferingPolicy: .bufferingNewest(1)) {
                     continuation.yield(value)

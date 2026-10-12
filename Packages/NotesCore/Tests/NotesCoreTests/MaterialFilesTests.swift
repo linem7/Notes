@@ -101,6 +101,17 @@ struct MaterialFilesTests {
         #expect(source == "\(id.uuidString)-source.txt")
     }
 
+    @Test func importFileKeepsOnlyTheLastExtensionAsWritten() throws {
+        let files = try makeFiles()
+        let archive = try files.importFile(from: try sourceFile(files, "backup.tar.gz"))
+        let upper = try files.importFile(from: try sourceFile(files, "SCAN.PDF"))
+        let hidden = try files.importFile(from: try sourceFile(files, ".env"))
+        #expect(archive.hasSuffix(".gz") && !archive.contains("tar"))
+        #expect(upper.hasSuffix(".PDF"))
+        #expect(UUID(uuidString: hidden) != nil)   // 隐藏文件没有扩展名
+        #expect(entries(files).count == 3)
+    }
+
     @Test func writeRejectsExtensionsThatEscapeTheFilesDirectory() throws {
         let files = try makeFiles()
         for ext in ["txt/../../x", "a/b"] {
