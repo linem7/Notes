@@ -18,7 +18,8 @@ public struct DueDate: Codable, Hashable, Sendable {
         let parts = day.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3, parts.map(\.count) == [4, 2, 2],
               let year = Int(parts[0]), let month = Int(parts[1]), let d = Int(parts[2]),
-              parts.allSatisfy({ $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return false }
+              parts.allSatisfy({ $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }),
+              year >= 1 else { return false }   // 0000-xx-xx 一律不合法
         return DateComponents(calendar: Calendar(identifier: .gregorian), year: year, month: month, day: d).isValidDate
     }
 }
