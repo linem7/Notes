@@ -97,4 +97,75 @@ struct NotesMaintenanceTests {
         #expect(!FileManager.default.fileExists(atPath: fresh.directory.path))
         #expect(!FileManager.default.fileExists(atPath: old.directory.path))
     }
+
+    /// ARCHITECTURE §9「不抛错：某一步失败记在 report 里，**其余步骤照常**」。
+    /// 前半句是 failedSteps，后半句是 staging 照清 —— 少了后半句就测不出「照常」。
+    @Test func aFailedStepIsReportedAndTheOtherStepsStillRun() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NotesMaintenanceTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let files = MaterialFiles(root: root)
+        let session = try files.makeStagingSession()
+        _ = try files.stage(data: Data("x".utf8), name: "x.txt", in: session)
+
+        let store = FailingNoteStore(failing: [.deleteExpiredDone, .referencedFileNames])
+        let report = await NotesMaintenance(store: store, files: files).run(.startup)
+
+        #expect(report.failedSteps == ["deleteExpiredDone", "garbageCollection"])
+        #expect(report.expiredNotesDeleted == 0)
+        #expect(report.garbageFilesDeleted == 0)
+        #expect(report.stagingDirectoriesDeleted == 1)
+        #expect(!FileManager.default.fileExists(atPath: session.directory.path))
+    }
+
+    /// 回收失败有两条入口：`collectGarbage` 自己数出删不掉的文件（`garbage.failed > 0`）和 store 整个抛出来。
+    /// 这条走前者：`files/` 只读时列得出条目、删不掉（`removeItem` 要父目录可写）。假设测试不是以 root 跑。
+    @Test func garbageCollectionFailuresAreReportedWithoutThrowing() async throws {
+        let f = try StoreFixture(.inMemory)
+        _ = try f.files.writeSourceText("没人引用的文件")
+        try f.ageAllFiles()
+        let filesPath = f.files.filesDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: filesPath)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: filesPath) }
+
+        let report = await NotesMaintenance(store: f.store, files: f.files).run(.startup)
+
+        #expect(report.failedSteps == ["garbageCollection"])
+        #expect(report.garbageFilesDeleted == 0)
+        #expect(report.expiredNotesDeleted == 0)
+    }
+}
+
+/// 清理路径用的桩：按需让某几步抛错，其余步骤按空库处理。
+private struct FailingNoteStore: NoteStoring {
+    enum Step: Hashable {
+        case deleteExpiredDone
+        case referencedFileNames
+    }
+
+    struct Boom: Error {}
+
+    var failing: Set<Step> = []
+
+    func referencedFileNames() async throws -> Set<String> {
+        if failing.contains(.referencedFileNames) { throw Boom() }
+        return []
+    }
+
+    func allNotes() async throws -> [NoteWithMaterials] { [] }
+    func observe() -> AsyncStream<[NoteWithMaterials]> { AsyncStream { $0.finish() } }
+    func insert(notes: [Note], materials: [Material]) async throws {}
+    func update(_ note: Note) async throws {}
+    func setDone(id: UUID, at: Date?) async throws {}
+    func delete(id: UUID) async throws {}
+    func addMaterial(noteID: UUID, from sourceURL: URL, displayName: String?) async throws -> Material { throw Boom() }
+    func addMaterial(_ material: Material) async throws {}
+    func deleteMaterial(id: UUID) async throws {}
+
+    func deleteExpiredDone(now: Date) async throws -> Int {
+        if failing.contains(.deleteExpiredDone) { throw Boom() }
+        return 0
+    }
+
+    func deleteAllDone() async throws -> Int { 0 }
 }
