@@ -12,6 +12,8 @@ final class BoardModel {
     private(set) var state = BoardState()
     private(set) var now: Date
     private(set) var hasLoaded = false
+    /// 写入失败时短暂显示的红色提示条（"Couldn't save"）。
+    private(set) var showsSaveError = false
 
     var calendar: Calendar
     let store: any NoteStoring
@@ -19,18 +21,24 @@ final class BoardModel {
 
     @ObservationIgnored private var notes: [NoteWithMaterials] = []
     @ObservationIgnored private var observeTask: Task<Void, Never>?
+    @ObservationIgnored private var errorTask: Task<Void, Never>?
+    /// 正在编辑的 NoteEditor 登记的「保存」动作；失焦时调用。
+    @ObservationIgnored private var editingCommit: (() -> Void)?
+    @ObservationIgnored private let errorDuration: Duration
     @ObservationIgnored private let highlightDuration: Duration
     @ObservationIgnored private let logger = Logger(subsystem: "com.linem7.Notes", category: "Board")
 
     init(
         store: any NoteStoring, files: MaterialFiles,
-        calendar: Calendar = .current, now: Date = Date(), highlightDuration: Duration = .seconds(3)
+        calendar: Calendar = .current, now: Date = Date(), highlightDuration: Duration = .seconds(3),
+        errorDuration: Duration = .seconds(4)
     ) {
         self.store = store
         self.files = files
         self.calendar = calendar
         self.now = now
         self.highlightDuration = highlightDuration
+        self.errorDuration = errorDuration
     }
 
     func start() {
@@ -75,7 +83,15 @@ final class BoardModel {
 
     // MARK: 交互状态
 
-    func toggleExpanded(_ id: UUID) { state.toggleExpanded(id) }
+    func toggleExpanded(_ id: UUID) {
+        commitEditing()  // 点别的行：先保存正在编辑的
+        state.toggleExpanded(id)
+    }
+
+    /// 编辑中失焦（点 Board 别处、切到别的 app）时保存；没在编辑时什么也不做。
+    func commitEditing() { editingCommit?() }
+
+    func registerEditingCommit(_ commit: (() -> Void)?) { editingCommit = commit }
     func beginEditing(_ id: UUID) { state.beginEditing(id) }
     func endEditing() { state.endEditing() }
     func setDoneExpanded(_ expanded: Bool) { state.isDoneExpanded = expanded }
@@ -133,7 +149,18 @@ final class BoardModel {
                 try await work(store)
             } catch {
                 logger.error("\(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                self.flashSaveError()
             }
+        }
+    }
+
+    private func flashSaveError() {
+        showsSaveError = true
+        errorTask?.cancel()
+        errorTask = Task { [weak self, errorDuration] in
+            try? await Task.sleep(for: errorDuration)
+            guard !Task.isCancelled else { return }
+            self?.showsSaveError = false
         }
     }
 }

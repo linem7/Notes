@@ -14,6 +14,7 @@ struct BoardView: View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.4)
+            if model.showsSaveError { saveErrorBar }
             if model.hasLoaded && model.sections.isEmpty {
                 emptyState
             } else {
@@ -21,6 +22,7 @@ struct BoardView: View {
             }
         }
         .frame(minWidth: 280, minHeight: 240)
+        .animation(.easeOut(duration: 0.2), value: model.showsSaveError)
     }
 
     private var header: some View {
@@ -40,6 +42,16 @@ struct BoardView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(WindowDragArea())
+    }
+
+    private var saveErrorBar: some View {
+        Text("Couldn't save")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .background(Color.red)
+            .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var emptyState: some View {
@@ -72,6 +84,7 @@ struct BoardView: View {
                 .padding(.horizontal, 8)
                 .padding(.bottom, 12)
             }
+            .onTapGesture { model.commitEditing() }  // 点列表空白处：保存正在编辑的
             .focusable()
             .focused($listFocused)
             .focusEffectDisabled()

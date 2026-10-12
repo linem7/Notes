@@ -67,6 +67,12 @@ final class BoardController {
         )
         let window = BoardWindow(mode: mode, rootView: view)
         self.window = window
+        // 切到别的 app（Board 不再是 key window）时，保存正在编辑的
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.commitEditing() }
+        }
         return window
     }
 

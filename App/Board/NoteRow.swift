@@ -99,7 +99,8 @@ struct NoteRow: View {
             onSave: { title, due, detail in model.save(id: note.id, title: title, due: due, detail: detail) },
             onCancel: { model.endEditing() },
             onAddFiles: { model.addFiles($0, to: note.id) },
-            onDeleteMaterial: { model.deleteMaterial($0) }
+            onDeleteMaterial: { model.deleteMaterial($0) },
+            onRegisterCommit: { model.registerEditingCommit($0) }
         )
         .padding(.leading, 24)
     }

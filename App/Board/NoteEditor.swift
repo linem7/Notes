@@ -12,6 +12,8 @@ struct NoteEditor: View {
     var onCancel: () -> Void
     var onAddFiles: ([URL]) -> Void
     var onDeleteMaterial: (UUID) -> Void
+    /// 登记失焦时要调用的保存动作；编辑器消失时传 nil。
+    var onRegisterCommit: ((() -> Void)?) -> Void
 
     @State private var title: String
     @State private var detail: String
@@ -23,7 +25,8 @@ struct NoteEditor: View {
     init(
         item: NoteWithMaterials, calendar: Calendar, files: MaterialFiles, opener: any URLOpening,
         onSave: @escaping (String, DueDate?, String) -> Void, onCancel: @escaping () -> Void,
-        onAddFiles: @escaping ([URL]) -> Void, onDeleteMaterial: @escaping (UUID) -> Void
+        onAddFiles: @escaping ([URL]) -> Void, onDeleteMaterial: @escaping (UUID) -> Void,
+        onRegisterCommit: @escaping ((() -> Void)?) -> Void
     ) {
         self.item = item
         self.calendar = calendar
@@ -33,6 +36,7 @@ struct NoteEditor: View {
         self.onCancel = onCancel
         self.onAddFiles = onAddFiles
         self.onDeleteMaterial = onDeleteMaterial
+        self.onRegisterCommit = onRegisterCommit
         let due = item.note.due
         _title = State(initialValue: item.note.title)
         _detail = State(initialValue: item.note.detail)
@@ -99,6 +103,8 @@ struct NoteEditor: View {
             }
             .controlSize(.small)
         }
+        .onAppear { onRegisterCommit(autoSave) }
+        .onDisappear { onRegisterCommit(nil) }
         .dropDestination(for: URL.self) { urls, _ in
             let fileURLs = urls.filter(\.isFileURL)
             guard !fileURLs.isEmpty else { return false }
@@ -109,9 +115,18 @@ struct NoteEditor: View {
         }
     }
 
+    private var currentDue: DueDate? {
+        hasDue ? DueDate(date: dueDate, includesTime: includesTime, calendar: calendar) : nil
+    }
+
+    /// 失焦：有改动且 Title 不为空就保存，否则直接结束编辑。Esc 才是放弃。
+    private func autoSave() {
+        let unchanged = trimmedTitle == item.note.title && detail == item.note.detail && currentDue == item.note.due
+        if trimmedTitle.isEmpty || unchanged { onCancel() } else { save() }
+    }
+
     private func save() {
         guard !trimmedTitle.isEmpty else { return }
-        let due = hasDue ? DueDate(date: dueDate, includesTime: includesTime, calendar: calendar) : nil
-        onSave(trimmedTitle, due, detail)
+        onSave(trimmedTitle, currentDue, detail)
     }
 }
