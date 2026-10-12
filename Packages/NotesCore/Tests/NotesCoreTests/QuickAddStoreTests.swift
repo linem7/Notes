@@ -160,6 +160,9 @@ struct QuickAddStoreTests {
         await waitUntil { box.isSet }
         let elapsed = Date().timeIntervalSince(start)   // 先取快照
         intake.release()                                // 再正常开闸
+        // 跑绿也要留痕：`elapsed` 是「取消后的等待没占住协作线程」的唯一读数，
+        // 只写在断言失败信息里就等于通过路径没有任何读数（#39）。
+        print("cancelledWaitsDoNotBlockUnrelatedWork: 无关任务 elapsed=\(String(format: "%.3f", elapsed))s（阈值 1.0s）")
         #expect(box.isSet)
         #expect(elapsed < 1.0, "无关任务跑了 \(elapsed) 秒 —— 取消后的等待占了协作线程（旧的忙等写法下这里是一整轮钉死）")
     }
