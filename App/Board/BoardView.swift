@@ -31,10 +31,16 @@ struct BoardView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .allowsHitTesting(false)
             Spacer()
-            Button(action: onAddNote) { Image(systemName: "plus") }
+            Button {
+                model.commitEditing()  // Quick Add 是非激活面板，Board 不会失焦，所以这里先保存
+                onAddNote()
+            } label: { Image(systemName: "plus") }
                 .buttonStyle(.plain)
                 .help("New Note")
-            Button(action: onClose) { Image(systemName: "xmark") }
+            Button {
+                model.commitEditing()
+                onClose()
+            } label: { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
                 .help("Hide Board")
         }

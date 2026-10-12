@@ -59,7 +59,7 @@ final class BoardWindow: NSPanel {
     private func restoreFrame() {
         let key = "NSWindow Frame \(Self.frameAutosaveName)"
         let hasSavedFrame = UserDefaults.standard.string(forKey: key) != nil
-        if !hasSavedFrame, let screen = NSScreen.main ?? NSScreen.screens.first {
+        if !hasSavedFrame, let screen = NSScreen.screens.first {
             let visible = screen.visibleFrame
             let size = Self.defaultSize
             let height = min(size.height, visible.height - 48)

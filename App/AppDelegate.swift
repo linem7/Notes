@@ -24,6 +24,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             boardController = controller
         } catch {
             logger.error("Couldn't open the note store: \(error.localizedDescription, privacy: .public)")
+            showStoreOpenFailure(error)
         }
+    }
+
+    /// 打开不了数据库时没法继续：弹一次提示，只能退出。
+    private func showStoreOpenFailure(_ error: Error) {
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = String(localized: "Couldn't open the notes database")
+        alert.informativeText = "\(error.localizedDescription)\n\n"
+            + String(localized: "Data folder:") + " " + Self.dataDirectory.path
+        alert.addButton(withTitle: String(localized: "Quit"))
+        NSApp.activate()
+        alert.runModal()
+        NSApp.terminate(nil)
     }
 }

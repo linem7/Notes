@@ -100,7 +100,8 @@ struct NoteRow: View {
         NoteEditor(
             item: item, calendar: model.calendar, files: model.files, opener: opener,
             onSave: { title, due, detail in model.save(id: note.id, title: title, due: due, detail: detail) },
-            onCancel: { model.endEditing() },
+            onCancel: { model.cancelEditing() },
+            onFinishWithoutChanges: { model.finishEditingWithoutChanges() },
             onAddFiles: { model.addFiles($0, to: note.id) },
             onDeleteMaterial: { model.deleteMaterial($0) },
             onRegisterCommit: { model.registerEditingCommit($0) }

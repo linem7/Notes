@@ -109,4 +109,119 @@ struct BoardStateTests {
         state.reconcile(existing: [])
         #expect(state.highlightedIDs.isEmpty)
     }
+
+    // MARK: 编辑中的各种退出路径（不能卡死）
+
+    private func editing(_ id: UUID) -> BoardState {
+        var state = BoardState()
+        state.toggleExpanded(id)
+        state.beginEditing(id)
+        return state
+    }
+
+    @Test func clickingAnotherRowWaitsForSaveThenExpandsIt() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        let handled = state.requestToggle(b)
+        #expect(!handled)  // 要先让编辑器提交
+        #expect(state.editingID == a)
+        state.saveFinished(id: a, succeeded: true)
+        #expect(state.editingID == nil)
+        #expect(state.expandedID == b)
+    }
+
+    @Test func failedSaveKeepsEditingAndEscStillExits() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        _ = state.requestToggle(b)
+        state.saveFinished(id: a, succeeded: false)
+        #expect(state.editingID == a)  // 用户输入还在
+        #expect(state.expandedID == a)  // 没有去展开 b
+        // 再点一次会重试
+        #expect(!state.requestToggle(b))
+        state.saveFinished(id: a, succeeded: false)
+        #expect(state.editingID == a)
+        // Esc 永远能退出，之后可以正常展开别的行
+        state.cancelEditing()
+        #expect(state.editingID == nil)
+        #expect(state.requestToggle(c))
+        #expect(state.expandedID == c)
+    }
+
+    @Test func escDropsThePendingExpand() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        _ = state.requestToggle(b)
+        state.cancelEditing()
+        state.saveFinished(id: a, succeeded: true)  // 迟到的保存结果
+        #expect(state.expandedID == a)
+        #expect(state.editingID == nil)
+    }
+
+    @Test func unchangedEditFinishesAndExpandsTheClickedRow() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        _ = state.requestToggle(b)
+        state.finishEditingWithoutChanges()
+        #expect(state.editingID == nil)
+        #expect(state.expandedID == b)
+    }
+
+    @Test func lateSaveResultForAnotherRowIsIgnored() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        state.saveFinished(id: b, succeeded: true)
+        #expect(state.editingID == a)
+    }
+
+    /// 编辑中勾选这条 Note 本身：它移进折叠着的 Done，编辑器随之消失。之后不能卡死。
+    @Test func tickingTheNoteBeingEditedDoesNotWedgeTheBoard() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        // 列表刷新：a 已完成，Done 区折叠，所以不可见
+        state.reconcile(existing: [a, b, c], visible: [b, c])
+        #expect(state.editingID == nil)
+        #expect(state.expandedID == nil)
+        #expect(state.selectedID == nil)
+        #expect(state.deletableID == nil)  // ⌫ 不会删到看不见的 Note
+        state.setEditorAvailable(false)  // 编辑器消失
+        #expect(state.requestToggle(b))
+        #expect(state.expandedID == b)
+    }
+
+    /// 同上，但保存（update）失败：编辑器已经随这一行消失，状态仍然要恢复。
+    @Test func tickingTheNoteBeingEditedWithFailedSaveDoesNotWedgeTheBoard() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        _ = state.requestToggle(b)
+        state.reconcile(existing: [a, b, c], visible: [b, c])
+        state.setEditorAvailable(false)
+        state.saveFinished(id: a, succeeded: false)  // 失败的结果晚到
+        #expect(state.editingID == nil)
+        #expect(state.requestToggle(c))
+        #expect(state.expandedID == c)
+    }
+
+    @Test func editorDisappearingEndsEditing() {
+        var state = editing(a)
+        state.setEditorAvailable(true)
+        state.setEditorAvailable(false)
+        #expect(state.editingID == nil)
+        #expect(state.requestToggle(b))
+    }
+
+    @Test func requestToggleRecoversWhenEditorNeverAppeared() {
+        var state = editing(a)  // beginEditing 之后编辑器还没出现
+        #expect(state.requestToggle(b))
+        #expect(state.editingID == nil)
+        #expect(state.expandedID == b)
+    }
+
+    @Test func collapsedDoneHidesItsRows() {
+        var state = BoardState()
+        state.toggleExpanded(a)
+        state.reconcile(existing: [a, b], visible: [b])
+        #expect(state.expandedID == nil)
+        #expect(state.selectedID == nil)
+    }
 }
