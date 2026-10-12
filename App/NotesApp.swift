@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct NotesApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         MenuBarExtra("Notes", systemImage: "note.text") {
             Button("Quit Notes") {
