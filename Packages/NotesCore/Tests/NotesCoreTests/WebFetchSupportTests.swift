@@ -114,18 +114,6 @@ struct WebFetchSupportTests {
         #expect(value == 7)
     }
 
-    @Test func aCancelledWaiterLeavesTheQueueWithoutTakingAPermit() async throws {
-        let limiter = FetchLimiter(limit: 1)
-        let holder = Task { try await limiter.withPermit { try await Task.sleep(for: .milliseconds(300)) } }
-        try await Task.sleep(for: .milliseconds(50))
-        let waiter = Task { try await limiter.withPermit { 1 } }
-        try await Task.sleep(for: .milliseconds(50))
-        waiter.cancel()
-        await #expect(throws: CancellationError.self) { try await waiter.value }
-        try await holder.value
-        #expect(try await limiter.withPermit { 2 } == 2)
-    }
-
     private actor Flag {
         private(set) var isSet = false
         func set() { isSet = true }
@@ -140,25 +128,71 @@ struct WebFetchSupportTests {
         Issue.record("等待超时")
     }
 
+    /// 门：`wait()` 一直等到 `open()`。用它让占着位置的任务停住，而不是靠 sleep 估时间
+    /// （CI 机器忙的时候 sleep 会差很多，占位的任务可能在测试取消之前就结束了）。
+    private actor Gate {
+        private var isOpen = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        func wait() async {
+            if isOpen { return }
+            await withCheckedContinuation { waiters.append($0) }
+        }
+
+        func open() {
+            isOpen = true
+            for waiter in waiters { waiter.resume() }
+            waiters = []
+        }
+    }
+
     @Test(.timeLimit(.minutes(1)))
-    func aCancelledQueuedFetchNeverRunsAndTheNextWaiterStillGetsTheSlot() async throws {
+    func aCancelledWaiterLeavesTheQueueWithoutTakingAPermit() async throws {
         let limiter = FetchLimiter(limit: 1)
-        let ran = Flag()
+        let gate = Gate()
         let holderStarted = Flag()
         let holder = Task {
             try await limiter.withPermit {
                 await holderStarted.set()
-                try await Task.sleep(for: .milliseconds(300))
+                await gate.wait()
+            }
+        }
+        try await waitUntil { await holderStarted.isSet }
+        let waiter = Task { try await limiter.withPermit { 1 } }
+        try await waitUntil { await limiter.waitingCount == 1 }
+
+        waiter.cancel()
+        await #expect(throws: CancellationError.self) { try await waiter.value }
+        #expect(await limiter.waitingCount == 0)
+
+        await gate.open()
+        try await holder.value
+        #expect(try await limiter.withPermit { 2 } == 2)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aCancelledQueuedFetchNeverRunsAndTheNextWaiterStillGetsTheSlot() async throws {
+        let limiter = FetchLimiter(limit: 1)
+        let ran = Flag()
+        let gate = Gate()
+        let holderStarted = Flag()
+        let holder = Task {
+            try await limiter.withPermit {
+                await holderStarted.set()
+                await gate.wait()
             }
         }
         try await waitUntil { await holderStarted.isSet }
         let cancelled = Task { try await limiter.withPermit { await ran.set() } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await limiter.waitingCount == 1 }
         let next = Task { try await limiter.withPermit { "next" } }
-        try await Task.sleep(for: .milliseconds(50))
+        try await waitUntil { await limiter.waitingCount == 2 }
 
         cancelled.cancel()
         await #expect(throws: CancellationError.self) { try await cancelled.value }
+        #expect(await limiter.waitingCount == 1)
+
+        await gate.open()
         try await holder.value
         #expect(try await next.value == "next")
         #expect(await ran.isSet == false)

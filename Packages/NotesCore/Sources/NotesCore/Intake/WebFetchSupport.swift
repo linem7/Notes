@@ -98,6 +98,9 @@ public actor FetchLimiter {
         return try await operation()
     }
 
+    /// 正在排队等位置的个数（测试用）。
+    var waitingCount: Int { waiters.count }
+
     private func acquire() async throws {
         if running < limit {
             running += 1
