@@ -4,7 +4,7 @@ public enum MaterialKind: String, Codable, Hashable, Sendable {
     case source, file, webPage
 }
 
-/// 挂在 Note 上的原始资料（ARCHITECTURE §3.1、§3.3）。文件名都相对 `materials/<noteID>/`。
+/// 挂在 Note 上的原始资料（ARCHITECTURE §3.1、§3.3）。文件名都相对 `materials/files/`，几条 Material 可以引用同一个文件。
 public struct Material: Identifiable, Hashable, Sendable {
     public var id: UUID
     public var noteID: UUID

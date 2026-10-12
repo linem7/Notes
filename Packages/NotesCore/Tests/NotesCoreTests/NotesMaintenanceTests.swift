@@ -8,50 +8,50 @@ struct NotesMaintenanceTests {
     }
 
     @Test(arguments: StoreKind.allCases)
-    func removesExpiredDoneNotesOrphanDirectoriesAndStaging(kind: StoreKind) async throws {
+    func removesExpiredDoneNotesUnreferencedFilesAndStaging(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
         let now = Date()
         let expired = note("expired", done: now.addingTimeInterval(-31 * 86_400))
         let live = note("live")
         try await f.store.insert(notes: [expired, live], materials: [])
-        _ = try await f.store.addMaterial(noteID: live.id, from: try f.sourceFile())
-
-        let orphan = UUID()
-        try f.files.write(Data("x".utf8), fileName: "x.txt", noteID: orphan)
+        let kept = try await f.store.addMaterial(noteID: live.id, from: try f.sourceFile())
+        let stray = try f.files.writeSourceText("x")    // 没有任何记录引用
         let session = try f.files.makeStagingSession()
         _ = try f.files.stage(data: Data("y".utf8), name: "y.txt", in: session)
+        try f.ageAllFiles()
 
-        // 孤儿目录要过了宽限期才删：把「现在」往后拨
-        let later = now.addingTimeInterval(NotesMaintenance.orphanGracePeriod + 60)
-        let report = await NotesMaintenance(store: f.store, files: f.files).run(now: later)
+        let report = await NotesMaintenance(store: f.store, files: f.files).run(now: now)
 
         #expect(report.expiredNotesDeleted == 1)
-        #expect(report.orphanDirectoriesDeleted == 1)
+        // 过期删除时 store 已经回收过一次，所以这里不断言 garbageFilesDeleted 的个数
         #expect(report.stagingDirectoriesDeleted == 1)
         #expect(report.failedSteps.isEmpty)
-        #expect(!f.exists(orphan))
-        #expect(f.exists(live.id))
+        #expect(f.fileNames() == [try #require(kept.storedFile)])
+        #expect(!f.fileNames().contains(stray))
         #expect(!FileManager.default.fileExists(atPath: session.directory.path))
     }
 
     @Test(arguments: StoreKind.allCases)
-    func freshDirectoriesAreNotTreatedAsOrphans(kind: StoreKind) async throws {
+    func maintenanceCollectsFilesLeftByACrashedSave(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
-        let saving = UUID()    // Quick Add 正在保存：文件已写，记录还没插入
-        try f.files.write(Data("x".utf8), fileName: "x.txt", noteID: saving)
-        let report = await NotesMaintenance(store: f.store, files: f.files).run(now: Date())
-        #expect(report.orphanDirectoriesDeleted == 0)
-        #expect(f.exists(saving))
+        let live = note("live")
+        try await f.store.insert(notes: [live], materials: [])
+        let kept = try await f.store.addMaterial(noteID: live.id, from: try f.sourceFile())
+        _ = try f.files.writeSourceText("写了文件但没来得及插记录")
+        try f.ageAllFiles()
+        let report = await NotesMaintenance(store: f.store, files: f.files).run()
+        // 清理的第一步（deleteExpiredDone）已经回收过一次，所以不断言 garbageFilesDeleted 的个数
+        #expect(report.failedSteps.isEmpty)
+        #expect(f.fileNames() == [try #require(kept.storedFile)])
     }
 
     @Test(arguments: StoreKind.allCases)
-    func directoriesThatAreNotUUIDsAreLeftAlone(kind: StoreKind) async throws {
+    func freshlyWrittenFilesAreNotCollected(kind: StoreKind) async throws {
         let f = try StoreFixture(kind)
-        let stray = f.files.materialsDirectory.appendingPathComponent("not-a-uuid", isDirectory: true)
-        try FileManager.default.createDirectory(at: stray, withIntermediateDirectories: true)
-        let later = Date().addingTimeInterval(NotesMaintenance.orphanGracePeriod + 60)
-        _ = await NotesMaintenance(store: f.store, files: f.files).run(now: later)
-        #expect(FileManager.default.fileExists(atPath: stray.path))
+        let saving = try f.files.writeSourceText("x")    // Quick Add 正在保存：文件已写，记录还没插入
+        let report = await NotesMaintenance(store: f.store, files: f.files).run(now: Date())
+        #expect(report.garbageFilesDeleted == 0)
+        #expect(f.fileNames() == [saving])
     }
 
     @Test(arguments: StoreKind.allCases)

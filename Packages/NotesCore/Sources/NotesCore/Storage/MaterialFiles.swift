@@ -15,7 +15,7 @@ public struct StagingSession: Hashable, Sendable {
     public let directory: URL
 }
 
-/// `materials/<noteID>/` 和 `staging/<sessionID>/` 的文件操作。`root` 在 App 里是
+/// `materials/files/` 和 `staging/<sessionID>/` 的文件操作（ARCHITECTURE §3.3：所有 Material 的文件放在同一个目录，几条 Material 可以引用同一个文件）。`root` 在 App 里是
 /// `~/Library/Application Support/com.linem7.Notes/`，测试里是临时目录。
 public struct MaterialFiles: Sendable {
     public let root: URL
@@ -24,14 +24,14 @@ public struct MaterialFiles: Sendable {
         self.root = root
     }
 
+    /// 刚写入的文件在这么久之内不会被 `collectGarbage` 回收。
+    public static let garbageGracePeriod: TimeInterval = 600
+
     var materialsDirectory: URL { root.appendingPathComponent("materials", isDirectory: true) }
+    var filesDirectory: URL { materialsDirectory.appendingPathComponent("files", isDirectory: true) }
     var stagingDirectory: URL { root.appendingPathComponent("staging", isDirectory: true) }
 
-    public func directory(for noteID: UUID) -> URL {
-        materialsDirectory.appendingPathComponent(noteID.uuidString, isDirectory: true)
-    }
-
-    /// 记录里的文件名只能是 `materials/<noteID>/` 下的一层名字，不能带路径（挡住 "../"）。
+    /// 记录里的文件名只能是 `materials/files/` 下的一层名字，不能带路径（挡住 "../"）。
     static func isPlainFileName(_ name: String) -> Bool {
         !name.isEmpty && name != "." && name != ".." && name == (name as NSString).lastPathComponent
     }
@@ -47,7 +47,7 @@ public struct MaterialFiles: Sendable {
         case .snapshot: name = material.snapshotFile
         }
         guard let name, Self.isPlainFileName(name) else { return nil }
-        let url = directory(for: material.noteID).appendingPathComponent(name)
+        let url = filesDirectory.appendingPathComponent(name)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
@@ -59,50 +59,85 @@ public struct MaterialFiles: Sendable {
         return try String(contentsOf: url, encoding: .utf8)
     }
 
-    // MARK: 写入 materials/<noteID>/
+    // MARK: 写入 materials/files/
 
-    public func write(_ data: Data, fileName: String, noteID: UUID) throws {
-        guard Self.isPlainFileName(fileName) else { throw MaterialFilesError.invalidFileName(fileName) }
-        let folder = directory(for: noteID)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try data.write(to: folder.appendingPathComponent(fileName), options: .atomic)
+    /// 把文件（或 `.pages` 这类 bundle 目录）按原样复制进 `files/`，返回存下的文件名 `<fileID>.<原扩展名>`。
+    public func importFile(from source: URL) throws -> String {
+        let name = Self.storedName(fileID: UUID(), ext: source.pathExtension)
+        try prepareFilesDirectory()
+        let destination = filesDirectory.appendingPathComponent(name)
+        try FileManager.default.copyItem(at: source, to: destination)
+        markFresh(destination)
+        return name
     }
 
-    /// 复制文件或目录（`.pages` 这类 bundle 是目录）。
-    public func copy(_ source: URL, fileName: String, noteID: UUID) throws {
-        guard Self.isPlainFileName(fileName) else { throw MaterialFilesError.invalidFileName(fileName) }
-        let folder = directory(for: noteID)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(at: source, to: folder.appendingPathComponent(fileName))
+    /// 写一份数据，返回文件名 `<fileID>.<ext>`。同一个 Web Page 的正文和快照传同一个 `fileID`。
+    public func write(_ data: Data, ext: String, fileID: UUID = UUID()) throws -> String {
+        let name = Self.storedName(fileID: fileID, ext: ext)
+        guard Self.isPlainFileName(name) else { throw MaterialFilesError.invalidFileName(name) }
+        try prepareFilesDirectory()
+        let destination = filesDirectory.appendingPathComponent(name)
+        try data.write(to: destination, options: .atomic)
+        markFresh(destination)
+        return name
     }
 
-    /// 把文件复制进 Note 目录并生成对应的 File 记录：`<materialID>.<原扩展名>`。
-    public func importFile(
-        _ source: URL,
-        noteID: UUID,
-        displayName: String? = nil,
-        now: Date = Date()
-    ) throws -> Material {
-        let id = UUID()
-        let ext = source.pathExtension
-        let fileName = ext.isEmpty ? id.uuidString : "\(id.uuidString).\(ext)"
-        try copy(source, fileName: fileName, noteID: noteID)
-        return Material(
-            id: id, noteID: noteID, kind: .file,
-            displayName: displayName ?? source.lastPathComponent,
-            storedFile: fileName, createdAt: now
-        )
+    /// 写 Source 原文，返回文件名 `<fileID>-source.txt`。
+    public func writeSourceText(_ text: String, fileID: UUID = UUID()) throws -> String {
+        let name = "\(fileID.uuidString)-source.txt"
+        try prepareFilesDirectory()
+        let destination = filesDirectory.appendingPathComponent(name)
+        try Data(text.utf8).write(to: destination, options: .atomic)
+        markFresh(destination)
+        return name
     }
 
-    /// 删掉 Material 记录引用的全部文件。
-    public func removeFiles(of material: Material) {
-        for name in [material.storedFile, material.textFile, material.snapshotFile].compactMap({ $0 }) where Self.isPlainFileName(name) {
-            try? FileManager.default.removeItem(at: directory(for: material.noteID).appendingPathComponent(name))
+    private static func storedName(fileID: UUID, ext: String) -> String {
+        ext.isEmpty ? fileID.uuidString : "\(fileID.uuidString).\(ext)"
+    }
+
+    private func prepareFilesDirectory() throws {
+        try FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+    }
+
+    /// 复制会保留源文件的修改时间，旧文件刚写进来就会落在宽限期之外；这里把修改时间改成现在。
+    private func markFresh(_ url: URL) {
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+    }
+
+    // MARK: 回收
+
+    public struct GarbageReport: Equatable, Sendable {
+        public var removed = 0
+        public var failed = 0
+        /// 没人引用，但还在宽限期内，这次留着。
+        public var keptInGracePeriod = 0
+    }
+
+    /// 回收 `files/` 里没有被任何 Material 行引用的条目（`referenced` 是所有行的 storedFile / textFile /
+    /// snapshotFile 的并集）。修改时间在 `garbageGracePeriod`（10 分钟）之内的不删：保存 Note 是先写文件、
+    /// 再在一个事务里插入记录，这中间别处触发的回收（删除另一条 Note、24 小时清理）不能把刚写好的文件当垃圾。
+    /// staging 不在这里处理。
+    @discardableResult
+    public func collectGarbage(referenced: Set<String>, now: Date = Date()) -> GarbageReport {
+        var report = GarbageReport()
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: filesDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        for url in urls where !referenced.contains(url.lastPathComponent) {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            if now.timeIntervalSince(modified) <= Self.garbageGracePeriod {
+                report.keptInGracePeriod += 1
+                continue
+            }
+            do {
+                try FileManager.default.removeItem(at: url)
+                report.removed += 1
+            } catch {
+                report.failed += 1
+            }
         }
-    }
-
-    public func removeNoteDirectory(_ noteID: UUID) {
-        try? FileManager.default.removeItem(at: directory(for: noteID))
+        return report
     }
 
     // MARK: staging
@@ -145,24 +180,6 @@ public struct MaterialFiles: Sendable {
             }
         }
         return (removed, failed)
-    }
-
-    /// `materials/` 下目录名是 UUID 的子目录：目录名 → 最后修改时间。其他名字不碰。
-    func noteDirectories() -> [UUID: Date] {
-        var result: [UUID: Date] = [:]
-        for url in subdirectories(of: materialsDirectory) {
-            guard let id = UUID(uuidString: url.lastPathComponent) else { continue }
-            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            result[id] = modified ?? .distantPast
-        }
-        return result
-    }
-
-    private func subdirectories(of folder: URL) -> [URL] {
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: []
-        )) ?? []
-        return urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
     }
 
     private func uniqueURL(for name: String, in folder: URL) -> URL {

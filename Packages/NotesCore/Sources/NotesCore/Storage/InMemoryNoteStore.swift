@@ -81,7 +81,11 @@ public actor InMemoryNoteStore: NoteStoring {
         guard notes[noteID] != nil else { throw NoteStoreError.noteNotFound(noteID) }
         let material: Material
         if let files {
-            material = try files.importFile(sourceURL, noteID: noteID, displayName: displayName, now: clock())
+            material = Material(
+                noteID: noteID, kind: .file,
+                displayName: displayName ?? sourceURL.lastPathComponent,
+                storedFile: try files.importFile(from: sourceURL), createdAt: clock()
+            )
         } else {
             material = Material(
                 noteID: noteID, kind: .file,
@@ -102,8 +106,8 @@ public actor InMemoryNoteStore: NoteStoring {
     }
 
     public func deleteMaterial(id: UUID) {
-        guard let material = materials.removeValue(forKey: id) else { return }
-        files?.removeFiles(of: material)
+        guard materials.removeValue(forKey: id) != nil else { return }
+        collectGarbage()
         publish()
     }
 
@@ -128,8 +132,16 @@ public actor InMemoryNoteStore: NoteStoring {
         for id in ids {
             notes[id] = nil
             for (materialID, material) in materials where material.noteID == id { materials[materialID] = nil }
-            files?.removeNoteDirectory(id)
         }
+        collectGarbage()
+    }
+
+    public func referencedFileNames() -> Set<String> {
+        Set(materials.values.flatMap { [$0.storedFile, $0.textFile, $0.snapshotFile] }.compactMap { $0 })
+    }
+
+    private func collectGarbage() {
+        files?.collectGarbage(referenced: referencedFileNames(), now: Date())
     }
 
     private func subscribe(_ id: UUID, _ continuation: AsyncStream<[NoteWithMaterials]>.Continuation) {

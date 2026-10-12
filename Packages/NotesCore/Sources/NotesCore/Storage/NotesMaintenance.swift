@@ -2,18 +2,15 @@ import Foundation
 
 public struct MaintenanceReport: Equatable, Sendable {
     public var expiredNotesDeleted = 0
-    public var orphanDirectoriesDeleted = 0
+    public var garbageFilesDeleted = 0
     public var stagingDirectoriesDeleted = 0
     /// 哪一步失败了（只记步骤名，不含 Note 内容）。
     public var failedSteps: [String] = []
 }
 
-/// 清理（ARCHITECTURE §9）：完成超过 30 天的 Note、没有记录的 Material 目录、遗留的 staging。
+/// 清理（ARCHITECTURE §9）：完成超过 30 天的 Note、没人引用的 Material 文件、遗留的 staging。
 /// App 在启动时和之后每 24 小时调用 `run`。
 public struct NotesMaintenance: Sendable {
-    /// 刚改过的目录不当孤儿：Quick Add 保存时先写文件再插入记录，这中间不能被清掉。
-    static let orphanGracePeriod: TimeInterval = 600
-
     private let store: any NoteStoring
     private let files: MaterialFiles
 
@@ -34,20 +31,11 @@ public struct NotesMaintenance: Sendable {
         }
 
         do {
-            let known = Set(try await store.allNotes().map(\.id))
-            var failed = false
-            for (id, modified) in files.noteDirectories() where !known.contains(id) {
-                guard now.timeIntervalSince(modified) > Self.orphanGracePeriod else { continue }
-                do {
-                    try FileManager.default.removeItem(at: files.directory(for: id))
-                    report.orphanDirectoriesDeleted += 1
-                } catch {
-                    failed = true
-                }
-            }
-            if failed { report.failedSteps.append("orphanDirectories") }
+            let garbage = files.collectGarbage(referenced: try await store.referencedFileNames(), now: now)
+            report.garbageFilesDeleted = garbage.removed
+            if garbage.failed > 0 { report.failedSteps.append("garbageCollection") }
         } catch {
-            report.failedSteps.append("orphanDirectories")
+            report.failedSteps.append("garbageCollection")
         }
 
         let staging = files.clearStaging(keeping: keepingStaging)
