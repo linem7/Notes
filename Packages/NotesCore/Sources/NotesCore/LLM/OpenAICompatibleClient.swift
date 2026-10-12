@@ -39,7 +39,8 @@ public struct OpenAICompatibleClient: Sendable {
     }
 
     /// 一次模型调用，流式返回正文片段，调用方自己拼成全文。出错时流以 `ChatError` 结束；
-    /// 取消调用方的 Task（或停止迭代）会取消请求，流以 `CancellationError` 结束。
+    /// 取消调用方的 Task（或停止迭代）会取消请求。取消后流直接结束，也可能以 `CancellationError` 结束；
+    /// 不会以其他错误结束。
     public func complete(
         system: String,
         user: String,
