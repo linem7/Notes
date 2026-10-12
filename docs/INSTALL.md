@@ -41,8 +41,8 @@ Notes 不发系统通知、不接日历、不做提醒。
 | Quick Add | ⌘⏎ | 保存 Draft；没有 Draft 时原样保存输入 |
 | Quick Add | ⌘. | 取消 Organize |
 | Quick Add | Esc | 隐藏面板（Organize 进行中时先取消） |
-| Board（Note 编辑） | ⌘⏎ / Esc | 保存 / 放弃编辑 |
-| Board（选中 Note） | ⌫ | 删除 Note，不弹确认 |
+| Board（Note 编辑） | ⌘⏎ / Esc | 保存 / 放弃修改；点 Board 别处或切到别的 app（失焦）也会保存 |
+| Board（点击选中 Note，未在编辑文字） | ⌫ | 删除 Note，不弹确认；只是展开不算选中，编辑文字时 ⌫ 只删字 |
 | 任意 | ⌘, | 打开 Settings |
 
 - 默认 **Option + N** 不需要 Accessibility 或 Screen Recording 权限。在美式键盘上 option+N 原本用来输入 ñ，注册后这个组合不再打字；如果和其他应用冲突，在 **Settings › General › Hotkey** 换一个组合。启动和改键时会检测与系统快捷键的冲突。
@@ -53,9 +53,9 @@ Notes 不发系统通知、不接日历、不做提醒。
 全部在本机：`~/Library/Application Support/com.linem7.Notes/`
 
 - `notes.sqlite`：Note 和 Material 的记录；
-- `materials/<noteID>/`：加入的文件副本、网页正文和 PDF 快照、粘贴的原文。
+- `materials/files/`：加入的文件副本、网页正文和 PDF 快照、粘贴的原文。同一个文件挂到多条 Note 时只存一份，最后一条用到它的 Note 删除后才删文件。
 
-可在 **Settings › Advanced › Open Data Folder** 在 Finder 中显示（TODO：按钮文案以实现为准）。完成超过 30 天的 Note 连同 Material 会静默自动删除。不做 iCloud 同步，也不做导出导入。
+可在 **Settings › Advanced** 的「打开数据目录」在 Finder 中显示（按钮实际文案以 #10 实现为准，真机核实）。完成超过 30 天的 Note 连同 Material 会静默自动删除。不做 iCloud 同步，也不做导出导入。
 
 聊天记录、文件、网页内容中的文字会发送给你配置的模型服务做 Organize；原始文件本身不会上传（图片 / 扫描版 PDF 在本机用 Apple Vision 做 OCR，只发送识别出的文字）。
 
@@ -97,4 +97,5 @@ while security delete-generic-password -s com.linem7.Notes.apikey >/dev/null 2>&
 - **文件 / 网页 Material 上有警告标记**：悬停查看原因（抓不到网页、OCR 没有文字等）。警告不阻止 Organize；Word、Excel、PPT 等类型只存不读，模型只看到文件名。
 - **改了界面语言没变化**：切换语言后需要重启，点 **Relaunch**。Note 的语言跟随输入，与界面语言无关。
 - **系统不显示 Open Anyway**：先从 Applications 尝试打开一次，再查看 Privacy & Security；受组织管理的 Mac 可能限制此操作，需要联系管理员。
+- **Board 顶部出现红色「Couldn't save」**：数据库写入失败，修改已回到之前的值，几秒后提示自动消失。请重试；反复出现请到 Issues 反馈（附系统版本，磁盘空间是否充足）。
 - **遇到其他问题**：到 [GitHub Issues](https://github.com/linem7/Notes/issues) 描述 macOS 版本、应用版本和复现步骤。截图或错误信息中请隐去 API key 和 Note 中的隐私内容。
