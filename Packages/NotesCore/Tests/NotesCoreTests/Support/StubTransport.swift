@@ -61,3 +61,28 @@ enum Fixture {
         return try String(contentsOf: url, encoding: .utf8)
     }
 }
+
+/// 假的 HTTPTransport：返回 200 和一个永远不出数据的 body，记下 body 有没有被取消。
+final class HangingTransport: HTTPTransport {
+    private let state = Mutex<(open: Bool, cancelled: Bool)>((false, false))
+
+    var bodyIsOpen: Bool { state.withLock { $0.open } }
+    var bodyWasCancelled: Bool { state.withLock { $0.cancelled } }
+
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        let body = AsyncThrowingStream<UInt8, any Error> { continuation in
+            state.withLock { $0.open = true }
+            continuation.onTermination = { [state] _ in state.withLock { $0.cancelled = true } }
+        }
+        return HTTPResponse(statusCode: 200, headers: [:], body: body)
+    }
+
+    /// 最多等 5 秒，条件成立就返回，否则记录失败。
+    func waitUntil(_ condition: () -> Bool) async throws {
+        for _ in 0..<500 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        Issue.record("等待超时")
+    }
+}

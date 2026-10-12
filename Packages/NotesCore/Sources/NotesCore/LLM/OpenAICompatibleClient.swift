@@ -30,7 +30,7 @@ public struct OpenAICompatibleClient: Sendable {
             try await Self.throwIfNotSuccess(response)
             let data = try await response.collectBody(limit: Self.modelListLimit)
             guard let list = try? JSONDecoder().decode(ModelList.self, from: data) else {
-                throw ChatError.providerError("无法解析 Model 列表")
+                throw ChatError.providerError("Couldn't parse the model list")
             }
             return list.data.map { $0.modelInfo }
         } catch {
@@ -106,8 +106,8 @@ public struct OpenAICompatibleClient: Sendable {
     private static func checkFinishReason(_ raw: String) throws {
         switch raw {
         case "insufficient_system_resource": throw ChatError.overloaded
-        case "aborted": throw ChatError.providerError("DeepSeek 中途中止了生成（finish_reason: aborted）")
-        case "content_filter": throw ChatError.providerError("回答被内容过滤拦截了（finish_reason: content_filter）")
+        case "aborted": throw ChatError.providerError("The provider stopped generating (finish_reason: aborted)")
+        case "content_filter": throw ChatError.providerError("The response was blocked by a content filter (finish_reason: content_filter)")
         default: break
         }
     }

@@ -61,8 +61,8 @@ struct OpenAICompatibleClientTests {
 
     @Test(arguments: [
         ("insufficient_system_resource", ChatError.overloaded),
-        ("aborted", ChatError.providerError("DeepSeek 中途中止了生成（finish_reason: aborted）")),
-        ("content_filter", ChatError.providerError("回答被内容过滤拦截了（finish_reason: content_filter）")),
+        ("aborted", ChatError.providerError("The provider stopped generating (finish_reason: aborted)")),
+        ("content_filter", ChatError.providerError("The response was blocked by a content filter (finish_reason: content_filter)")),
     ])
     func finishReasonsThatAreErrors(raw: String, expected: ChatError) async throws {
         let transport = StubTransport(body: chunk("Hi") + chunk(nil, finishReason: raw))
@@ -112,6 +112,26 @@ struct OpenAICompatibleClientTests {
         await #expect(throws: ChatError.network) {
             try await collect(StubTransport(.failure(.network)))
         }
+    }
+
+    @Test func cancellingTheConsumerCancelsTheTransport() async throws {
+        let transport = HangingTransport()
+        let client = OpenAICompatibleClient(transport: transport)
+        let connection = self.connection
+        let consumer = Task {
+            let stream = client.complete(
+                system: "", user: "Hi", modelID: "deepseek-flash", connection: connection, apiKey: "sk-test", jsonMode: false
+            )
+            for try await _ in stream {}
+        }
+        try await transport.waitUntil { transport.bodyIsOpen }
+        consumer.cancel()
+        // 取消之后消费者必须结束：以 CancellationError 结束，或者流直接结束；不能是别的错误，也不能卡住
+        do {
+            try await consumer.value
+        } catch is CancellationError {
+        }
+        try await transport.waitUntil { transport.bodyWasCancelled }
     }
 
     // MARK: 请求
@@ -210,6 +230,11 @@ struct OpenAICompatibleClientTests {
         #expect(fields["reasoning"] == .object(["enabled": .bool(false)]))
         #expect(fields["thinking"] == nil)
         #expect(fields["enable_thinking"] == nil)
+    }
+
+    @Test func euEndpointStillDisablesReasoning() async throws {
+        let fields = try await sentFields(custom("https://eu.openrouter.ai/api/v1"), modelID: "deepseek/deepseek-v4.1-flash")
+        #expect(fields["reasoning"] == .object(["enabled": .bool(false)]))
     }
 
     @Test func openRouterModelsThatMustReasonGetTheirLowestEffort() async throws {
@@ -365,7 +390,7 @@ struct OpenAICompatibleClientTests {
     }
 
     @Test func unparsableModelListIsProviderError() async throws {
-        await #expect(throws: ChatError.providerError("无法解析 Model 列表")) {
+        await #expect(throws: ChatError.providerError("Couldn't parse the model list")) {
             try await OpenAICompatibleClient(transport: StubTransport(body: "<html>")).listModels(connection: connection, apiKey: "k")
         }
     }

@@ -81,7 +81,7 @@ public struct URLSessionTransport: HTTPTransport {
             throw Self.map(error)
         }
         guard let http = response as? HTTPURLResponse else {
-            throw ChatError.providerError("不是 HTTP 响应")
+            throw ChatError.providerError("Not an HTTP response")
         }
         var headers: [String: String] = [:]
         for (name, value) in http.allHeaderFields {
@@ -115,6 +115,6 @@ public struct URLSessionTransport: HTTPTransport {
 /// 没有可用网络实现的平台（Linux）。只是为了让包能在 Linux 上编译和测试。
 struct UnavailableTransport: HTTPTransport {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
-        throw ChatError.providerError("这个平台上没有网络实现")
+        throw ChatError.providerError("No network implementation on this platform")
     }
 }
