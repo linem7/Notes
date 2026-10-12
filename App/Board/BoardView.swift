@@ -7,6 +7,8 @@ struct BoardView: View {
     let opener: any URLOpening
     var onAddNote: () -> Void
     var onClose: () -> Void
+    var onShowInFinder: () -> Void
+    var onRetry: () -> Void
 
     @FocusState private var listFocused: Bool
 
@@ -14,11 +16,15 @@ struct BoardView: View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.4)
-            if model.showsSaveError { saveErrorBar }
-            if model.hasLoaded && model.sections.isEmpty {
-                emptyState
+            if let reason = model.openFailure {
+                openFailureState(reason)
             } else {
-                list
+                if model.showsSaveError { saveErrorBar }
+                if model.hasLoaded && model.sections.isEmpty {
+                    emptyState
+                } else {
+                    list
+                }
             }
         }
         .frame(minWidth: 280, minHeight: 240)
@@ -68,6 +74,27 @@ struct BoardView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// SPEC §2.2：数据库打不开时不弹窗，在 Board 里给原因和两个出口。
+    private func openFailureState(_ reason: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle").font(.system(size: 26)).foregroundStyle(.tertiary)
+            Text("Notes can't open its data").font(.system(size: 13, weight: .medium))
+            Text(reason)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .textSelection(.enabled)
+            HStack(spacing: 8) {
+                Button("Show in Finder") { onShowInFinder() }
+                Button("Retry") { onRetry() }
+            }
+            .controlSize(.small)
+            .padding(.top, 2)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -12,6 +12,7 @@ final class BoardController {
     let model: BoardModel
     private let defaults: UserDefaults
     private let onAddNote: () -> Void
+    private let onRetry: () -> Void
     private var window: BoardWindow?
 
     var mode: BoardMode {
@@ -24,15 +25,22 @@ final class BoardController {
     var isVisible: Bool { window?.isVisible ?? false }
 
     init(
-        store: any NoteStoring, files: MaterialFiles, defaults: UserDefaults = .standard,
-        onAddNote: @escaping () -> Void
+        store: (any NoteStoring)?, files: MaterialFiles, openFailure: String? = nil, defaults: UserDefaults = .standard,
+        onAddNote: @escaping () -> Void, onRetry: @escaping () -> Void
     ) {
         self.defaults = defaults
         self.onAddNote = onAddNote
+        self.onRetry = onRetry
         mode = defaults.string(forKey: Self.modeKey).flatMap(BoardMode.init(rawValue:)) ?? .onDesktop
-        model = BoardModel(store: store, files: files)
+        model = BoardModel(store: store, files: files, openFailure: openFailure)
         observeClock()
     }
+
+    /// 数据库打不开之后 Retry 成功：把 Board 接到新的 store 上（窗口不动）。
+    func attach(store: any NoteStoring) { model.attach(store: store) }
+
+    /// Retry 又失败：换掉 Board 上显示的原因。
+    func setOpenFailure(_ reason: String) { model.setOpenFailure(reason) }
 
     /// app 启动时调用：开始订阅，并按上次的显示状态恢复（第一次默认显示）。
     func start() {
@@ -58,12 +66,21 @@ final class BoardController {
         model.highlight(noteIDs: noteIDs)
     }
 
+    /// Board 纠错态的「Show in Finder」：与设置 Advanced 页那一个按钮同一个动作。
+    private func showDataFolder() {
+        let directory = AppDelegate.dataDirectory
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.activateFileViewerSelecting([directory])
+    }
+
     private func ensureWindow() -> BoardWindow {
         if let window { return window }
         let view = BoardView(
             model: model, opener: WorkspaceURLOpener(),
             onAddNote: { [weak self] in self?.onAddNote() },
-            onClose: { [weak self] in self?.hide() }
+            onClose: { [weak self] in self?.hide() },
+            onShowInFinder: { [weak self] in self?.showDataFolder() },
+            onRetry: { [weak self] in self?.onRetry() }
         )
         let window = BoardWindow(mode: mode, rootView: view)
         self.window = window

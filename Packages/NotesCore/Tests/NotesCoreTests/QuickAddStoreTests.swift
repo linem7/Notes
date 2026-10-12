@@ -560,6 +560,31 @@ struct QuickAddStoreTests {
         await waitUntil { env.store.phase == .drafts }
         #expect(env.organizer.calls.first?.materials.count == 1)
     }
+
+    // MARK: 数据库打不开（SPEC §2.2）
+
+    /// 现取不到 store 时保存失败，但输入一个字都不能丢。
+    @Test func saveWithoutStoreFailsAndKeepsInput() async {
+        let files = MaterialFiles(root: FileManager.default.temporaryDirectory.appendingPathComponent("QuickAddResolve-\(UUID().uuidString)"))
+        let intake = FakeIntake()
+        let store = QuickAddStore(
+            organizer: FakeOrganizer(),
+            saver: ResolvingQuickAddSaver(files: files, resolve: { nil }),
+            makeIntake: { intake },
+            saveTimeout: .seconds(5), linkDetectionDelay: .milliseconds(1)
+        )
+
+        store.inputText = "buy milk"
+        #expect(store.canSave)
+
+        await store.save()
+
+        #expect(store.saveFailed)
+        #expect(store.inputText == "buy milk")
+        // 一个文件都没写，也就没有 Note 产生
+        let written = (try? FileManager.default.contentsOfDirectory(atPath: files.filesDirectory.path)) ?? []
+        #expect(written.isEmpty)
+    }
 }
 
 /// 一个线程安全的布尔盒子（跨任务读结果用）。

@@ -141,4 +141,50 @@ struct QuickAddSaveBuilderTests {
     @Test func asIsWithNothingIsNil() {
         #expect(QuickAddSaveBuilder.asIsEntry(input: " \n ", materials: []) == nil)
     }
+
+    // MARK: 保存时现取 store（SPEC §2.2）
+
+    private func scratchFiles(_ label: String) -> MaterialFiles {
+        MaterialFiles(root: FileManager.default.temporaryDirectory.appendingPathComponent("\(label)-\(UUID().uuidString)"))
+    }
+
+    private func writtenFiles(in files: MaterialFiles) -> [String] {
+        (try? FileManager.default.contentsOfDirectory(atPath: files.filesDirectory.path)) ?? []
+    }
+
+    /// 现取不到 store：抛 `StoreUnavailable`，一个文件都不写。
+    @Test func resolvingSaverWithoutStoreThrowsAndWritesNothing() async throws {
+        let files = scratchFiles("QuickAddSaver")
+        let saver = ResolvingQuickAddSaver(files: files, resolve: { nil })
+        let request = QuickAddSaveRequest(
+            entries: [entry("A", [])], sourceText: "hello", materials: [], now: Date()
+        )
+
+        await #expect(throws: ResolvingQuickAddSaver.StoreUnavailable.self) {
+            try await saver.save(request)
+        }
+        #expect(writtenFiles(in: files).isEmpty)
+    }
+
+    /// 正对照：同一份 request，store 现取得到时真的写文件、真的插进去 ——
+    /// 有它，上面那条「什么都没写」才不是「整条链路本来就不通」。
+    @Test func resolvingSaverWithStoreWritesFilesAndInserts() async throws {
+        let files = scratchFiles("QuickAddSaver")
+        let store = InMemoryNoteStore(files: files)
+        let saver = ResolvingQuickAddSaver(files: files, resolve: { store })
+        let request = QuickAddSaveRequest(
+            entries: [entry("A", [])], sourceText: "hello", materials: [], now: Date()
+        )
+
+        let ids = try await saver.save(request)
+
+        #expect(ids.count == 1)
+        let written = writtenFiles(in: files)
+        #expect(written.count == 1)
+        #expect(written.allSatisfy { $0.hasSuffix("-source.txt") })
+        let saved = await store.allNotes()
+        #expect(saved.count == 1)
+        #expect(saved[0].note.id == ids[0])
+        #expect(saved[0].materials.contains { $0.kind == .source })
+    }
 }

@@ -241,16 +241,6 @@
         }
       }
     },
-    "Couldn't open the notes database" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法打开 Notes 数据库"
-          }
-        }
-      }
-    },
     "Couldn't read this file." : {
       "localizations" : {
         "zh-Hans" : {
@@ -307,16 +297,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "数据目录"
-          }
-        }
-      }
-    },
-    "Data folder:" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "数据目录："
           }
         }
       }
@@ -674,6 +654,16 @@
         }
       }
     },
+    "Notes can't open its data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes 无法打开数据"
+          }
+        }
+      }
+    },
     "Nothing to do" : {
       "localizations" : {
         "zh-Hans" : {
@@ -860,16 +850,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快速添加"
-          }
-        }
-      }
-    },
-    "Quit" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "退出"
           }
         }
       }

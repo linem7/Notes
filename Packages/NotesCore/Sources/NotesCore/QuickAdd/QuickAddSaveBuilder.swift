@@ -155,3 +155,25 @@ public struct MaterialFilesWriter: MaterialFileWriting, Sendable {
     public func write(_ data: Data, ext: String) throws -> String { try files.write(data, ext: ext) }
     public func writeSourceText(_ text: String) throws -> String { try files.writeSourceText(text) }
 }
+
+/// 保存时现取 store：数据库一开始打不开也能装好 Quick Add，Retry 成功后自动就能存（SPEC §2.2）。
+public struct ResolvingQuickAddSaver: QuickAddSaving {
+    /// 拿不到 store（数据库打不开）。
+    public struct StoreUnavailable: Error {}
+
+    private let writer: MaterialFilesWriter
+    private let resolve: @Sendable () async -> (any NoteStoring)?
+
+    public init(files: MaterialFiles, resolve: @escaping @Sendable () async -> (any NoteStoring)?) {
+        writer = MaterialFilesWriter(files: files)
+        self.resolve = resolve
+    }
+
+    public func save(_ request: QuickAddSaveRequest) async throws -> [UUID] {
+        // 先取 store：取不到就直接失败，一个文件都不写
+        guard let store = await resolve() else { throw StoreUnavailable() }
+        let output = try QuickAddSaveBuilder.build(request, writer: writer)
+        try await store.insert(notes: output.notes, materials: output.materials)
+        return output.notes.map(\.id)
+    }
+}
