@@ -1,16 +1,13 @@
 # MEMORY
 
-## 进度
-- 2026-10-12：grilling 完成，SPEC / ARCHITECTURE / CONTEXT / ADR 落地；按 ARCHITECTURE §11 拆 issue。
-- 2026-10-12：#2–#8 已合并（工程骨架、NotesCore 存储 / 客户端 / Intake / Organize、WebPageFetcher、Board）。
-- 2026-10-12：剩下的三个 issue 交给 team-orchestrator 的 `notes` 团队收尾：
-  - **#9 Quick Add** —— PR #22，Draft，CI 红（`Test NotesCore` 挂住直到 15 分钟超时）。
-  - **#10 菜单栏、设置、首次启动、界面语言、开机启动** —— PR #23，CI 绿，等 #9 合并后接 Quick Add。
-  - **#11 测试补齐、INSTALL.md、v0.1.0 发布准备** —— PR #13，Draft，只含文档部分。
-- 2026-10-12：团队暂停后恢复；三层结构生效——dev-lead 只管跨部门排序 / 合并 / 维护 #1 / 汇报，frontend / backend / review 三个部门 lead 各自计划、分派、审本部门。
-- 2026-10-12：B 线、C 线改走 `git merge origin/main`，不再 rebase——rebase 已推送过的分支会产生 non-fast-forward，只能 force push，而它是 deny。C 线改为「从远端建 `issue-13-publish` 分支 + merge + fast-forward push」。
-- 2026-10-12：SPEC §2.2（数据库打不开时 Board 内纠错态 + Quick Add 禁止保存）用户定为纳入 v1，另开 issue #33，排在 #9 合并之后。
-- 2026-10-12：#9 已合并（PR #22，squash 到 main 560ebea）；#1 的「真机待验」已收 #9 的 16 条快照；B 线开始 merge origin/main + 接线。
+## 进度（2026-10-13）
+- #2–#11、#33 均已完成并合并；旧的 A/B/C 线排期、待接线与待合并状态已失效。
+- #36 / PR #41：垃圾回收列目录失败不再被吞掉；#37 / PR #42：Due Date 非法日期回读校验；#38：OCR 已修复并复核关闭；#39 / PR #43：取消等待测试通过时也记录耗时。
+- #1 的 17 条待确认和 2 条 Parked 已逐条复核归档。保留宽松解析、Title 空白归一化、单条坏数据丢弃；术语按 CONTEXT.md 逐键判断。Hotkey 的空 localizations 有意保留；文档继续使用英文源文案定位控件。
+- 用户本轮明确确认「真机测试已经通过了」，#1 真机清单依据用户确认归档；不是代理本轮逐项实测。
+- 用户确认验收完成后授权清理；已删除 /tmp/nbhang 与 /tmp/notes-doc-snapshots。/tmp/review-build-scratch、/tmp/spec32-scratch 复核时已不存在。~/.claude/settings.json 的两个时间戳备份已删除，原文件保留。
+- #45：v1 后补手动界面文案核对脚本，不加入 CI，不阻塞发布；接替已关闭 #11 的维护归属。
+- #44 / PR #46：取消等待测试上限 1 → 2 秒，使用 ContinuousClock；本机完整测试连跑 10 次（每次 446 tests / 42 suites）全通过，目标用例 0.118–0.137 秒。改后注入旧忙等 3 次均在约 3.15 秒失败；故障桩已恢复。macos-26 CI（run 38341614328）构建及 446 tests 全通过，目标用例 0.373 秒；PR #46 已合并。
 
 ## 环境（2026-10-12 更正，重要）
 - **开发这台机器是 macOS 27.0、Xcode 27.0、Swift 6.4、XcodeGen 2.46、arm64。** 可以本地跑

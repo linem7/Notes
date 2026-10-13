@@ -160,7 +160,9 @@ Readable Text……
 }
 ```
 
-- 宽松解析：去掉 ```` ```json ```` 围栏；取第一个 `{` 到最后一个 `}`；`due`、`time` 格式不对就当空；`materials` 缺失或为空表示「全部 Material」，越界的序号丢弃；`title` 为空的条目丢弃；`notes` 为空数组时生成一条 fallback。
+- 宽松解析：去掉 ```` ```json ```` 围栏后，接受 `{"notes": […]}`、裸数组或带 `title` 的单个对象；整体解析失败时，依次尝试第一个 `{` 到最后一个 `}`、第一个 `[` 到最后一个 `]` 之间的 JSON，以容忍前后闲话。
+- Title 去掉首尾空白，换行和连续空白折成一个空格；缺失、非字符串或只含空白的 `title` 丢弃该条，其他有效条目保留。没有有效条目时生成一条 fallback。
+- `due`、`time` 格式不对就当空；`materials` 缺失或为空表示「全部 Material」，越界的序号丢弃。
 - 解析失败：fallback 为一条 Draft，Title = 输入第一行（最多 80 字符），Detail = 模型原文，挂全部 Material。
 - 结果是 `[Draft]`，`Draft` 有 `title`、`due`、`detail`、`materialIndices`、`isSelected`。
 
