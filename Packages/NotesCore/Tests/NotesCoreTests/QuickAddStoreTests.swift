@@ -130,14 +130,14 @@ struct QuickAddStoreTests {
     }
 
     /// 取消之后的等待不得阻止无关的 async 工作推进：起 K = 核数 + 4 个「被取消后仍在等」的桩，
-    /// 再让一个无关的 detached 任务跑一小段 —— 它必须在 1 秒内跑完（旧写法会把协作线程占死）。
+    /// 再让一个无关的 detached 任务跑一小段 —— 它必须在 2 秒内跑完（旧写法会把协作线程占死）。
     ///
     /// 失败形态也要能收场：旧写法下这些等待会把协作池占死，测试体自己都可能一直醒不过来。
     /// 所以除了正常路径的 `release()`，还有一个挂在 **libdispatch 自己的线程上**（不是协作池）的
     /// 3 秒兜底开闸 —— 池子被占死时它照样准时开闸，让池子恢复、让断言和 `✘` 打得出来，
     /// 而不是把整轮测试钉死到 15 分钟超时。
-    /// 兜底松闸只会让 `elapsed` 变**小**，不可能变大：观测到 `elapsed ≥ 1 秒`，
-    /// 只能是「无关工作在 1 秒内确实没跑完」，松闸没帮忙圆谎。
+    /// #44：正常实现曾在 CI 用时 1.092 秒；本机恢复旧忙等后 3 次均约 3.15 秒。
+    /// 阈值取 2 秒，为调度噪声留空间，同时仍早于 3 秒兜底；耗时超限不直接归因为忙等。
     @Test func cancelledWaitsDoNotBlockUnrelatedWork() async {
         let box = FlagBox()
         let env = Env()
@@ -151,20 +151,21 @@ struct QuickAddStoreTests {
         let intake = env.intake
         DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) { intake.release() }
 
-        let start = Date()
+        let maximumLatency: Duration = .seconds(2)
+        let start = ContinuousClock.now
         Task.detached {
             var sum = 0
             for i in 0..<2_000_000 { sum &+= i }
             box.set(sum != 0)
         }
         await waitUntil { box.isSet }
-        let elapsed = Date().timeIntervalSince(start)   // 先取快照
+        let elapsed = start.duration(to: .now)          // 单调时钟：不受系统校时影响
         intake.release()                                // 再正常开闸
         // 跑绿也要留痕：`elapsed` 是「取消后的等待没占住协作线程」的唯一读数，
         // 只写在断言失败信息里就等于通过路径没有任何读数（#39）。
-        print("cancelledWaitsDoNotBlockUnrelatedWork: 无关任务 elapsed=\(String(format: "%.3f", elapsed))s（阈值 1.0s）")
+        print("cancelledWaitsDoNotBlockUnrelatedWork: 无关任务 elapsed=\(elapsed)（阈值 \(maximumLatency)）")
         #expect(box.isSet)
-        #expect(elapsed < 1.0, "无关任务跑了 \(elapsed) 秒 —— 取消后的等待占了协作线程（旧的忙等写法下这里是一整轮钉死）")
+        #expect(elapsed < maximumLatency, "无关任务耗时 \(elapsed)，超过 \(maximumLatency)；检查协作线程是否被占用或运行环境负载过高")
     }
 
     @Test func saveWaitsForPendingReadableText() async {
